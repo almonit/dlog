@@ -1,0 +1,14 @@
+node_modules
+build
+repo
+test
+src/**.js
+.idea/*
+.circleci
+
+coverage
+.nyc_output
+*.log
+
+package-lock.json
+yarn.lock
