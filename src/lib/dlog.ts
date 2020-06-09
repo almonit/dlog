@@ -1,9 +1,9 @@
 // import all from 'it-all';
-// import CID from 'cids';
+import CID from 'cids';
+import BufferList from 'bl';
 import IPFS from 'ipfs';
 import { IPFSPath } from 'ipfs/types/interface-ipfs-core/common';
 import Web3 from 'web3';
-import BufferList from 'bl';
 
 import {
   Article,
@@ -48,17 +48,19 @@ export class DLog {
   }
 
   /**
-   * @desc 
+   * @desc
    * Method for getting content hash from given ens address,
    * then will retrieve identity json file from ipfs hash
    * and lastly will read the `buckets` key of the `identity.json`
    * then return the latest bucket CID
-   * 
+   *
    * @param ens_address ENS address e.g. 'mdt.eth'
    */
   public async retrieveLatestBucket(ens_address: string): Promise<Bucket> {
     const content_hash: string = await this.getContentHash(ens_address);
     const identity: Identity = await this.retrieveIdentity(content_hash);
+    // TO DO be sure returned object is casted into Identity model
+    // otherwise the one below will not work
     const bucket_cid = identity.getBucketCID(0);
     const bucket: Bucket = await this.getBucket(bucket_cid);
 
@@ -90,7 +92,7 @@ export class DLog {
   }
 
   /**
-   * 
+   *
    * @param ens_address ENS address e.g. 'mdt.eth'
    * @param article Article Object
    */
@@ -100,6 +102,7 @@ export class DLog {
   ): Promise<void> {
     const article_cid: IPFSPath = await this.putArticle(article);
     const { author, cover_image } = article;
+    // TO DO think of a way to extract summary, title for Article Summary model
     const article_summary: ArticleSummary = {
       author: author[0].toString(),
       content: article_cid,
@@ -107,10 +110,16 @@ export class DLog {
       summary: '',
       title: ''
     };
+    // TODO after here make another method to update bucket array in identity object
     const article_summary_cid = await this.putArticleSummary(article_summary);
     const bucket: Bucket = await this.retrieveLatestBucket(ens_address);
     bucket.addArticle(article_summary_cid);
+    const updated_bucket_cid = await this.putBucket(bucket);
+    console.log('updated_bucket_cid', updated_bucket_cid)
     // TO DO continue for return
+    // have additional method on identity; 
+    // if latest bucket still has place, update recent hash,
+    // if new bucket called, pop last known bucket and unshift new one to the list
   }
 
   /**
@@ -119,19 +128,23 @@ export class DLog {
    */
   public async retrieveIdentity(content_hash: string): Promise<Identity> {
     /**
-     * TO DO look for reading identity
+     * look for reading identity
      * @see https://github.com/ipfs/js-ipfs/blob/master/docs/core-api/FILES.md#ipfsgetipfspath-options
      * @see https://github.com/ipfs/js-ipfs/blob/master/docs/core-api/OBJECT.md#ipfsobjectgetcid-options
      */
     const identity_data = await this.getFiles(
       this.pathJoin([content_hash, DLog.IDENTITY_FILE])
     );
-    const identity: Identity = JSON.parse(identity_data[0].toString());
+    const { author, buckets } = JSON.parse(identity_data[0].toString());
+    const identity = new Identity(
+      new CID(1, author.codec, Buffer.from(author.hash.data)),
+      buckets
+    );
     return identity;
   }
 
   /**
-   * 
+   *
    * @param content_hash CID object of identity
    */
   public async pinIdentity(content_hash: IPFSPath): Promise<IPFSPath> {
@@ -146,7 +159,7 @@ export class DLog {
    */
   public async createIdentity(identity: Identity): Promise<IPFSPath> {
     /**
-     * TO DO look for writing identity + main page CID
+     * look for writing identity + main page CID
      * @see https://github.com/ipfs/js-ipfs/blob/master/docs/core-api/FILES.md#ipfsadddata-options
      * @see https://github.com/ipfs/js-ipfs/blob/master/docs/core-api/FILES.md#ipfsfilescpfrom-to-options
      */
@@ -162,7 +175,17 @@ export class DLog {
       identity.asBuffer(),
       { create: true }
     );
-    await this.cp(DLog.AUTHOR_PAGE, this.pathJoin(['/stuff', DLog.INDEX_FILE]));
+    await this.cp(
+      DLog.AUTHOR_PAGE,
+      this.pathJoin(['/stuff', DLog.INDEX_FILE]),
+      {
+        parents: true,
+        format: 'dag-pb',
+        hashAlg: 'sha2-256',
+        flush: true,
+        timeout: 5000
+      }
+    );
     const { cid }: { cid: IPFSPath } = await this.node.files.stat('/stuff');
     // const directory_contents = await all(this.node.files.ls('/stuff'))
     // const read_chunks = this.node.files.read('/stuff/index.html', {});
@@ -179,8 +202,8 @@ export class DLog {
    * @param options [setContentHash options]
    */
   public async register(
-    identity: Identity,
     ens_address,
+    identity: Identity,
     options?: object
   ): Promise<string> {
     const user_cid = await this.createIdentity(identity);
@@ -227,17 +250,15 @@ export class DLog {
     return pinset;
   }
 
-  private async cp(from: IPFSPath | string, to: string): Promise<void> {
+  private async cp(
+    from: IPFSPath | string,
+    to: string,
+    options: object = {}
+  ): Promise<void> {
     try {
-      await this.node.files.cp(from, to, {
-        parents: true,
-        format: 'dag-pb',
-        hashAlg: 'sha2-256',
-        flush: true,
-        timeout: 5000
-      }); // TO DO get options as method parameter
+      await this.node.files.cp(from, to, options);
     } catch (error) {
-      console.warn('IPFS.Files.CP', error.code);
+      console.warn('IPFS.Files.CP', error.code, from);
       for await (const file of this.node.get(from)) {
         if (!file.content) continue;
         const cp_content = await this.fromBuffer(file.content);
@@ -254,15 +275,17 @@ export class DLog {
   }
 
   private async setContentHash(ens: ENSContent): Promise<string> {
-    const result = await this.web3.eth.ens.setContenthash(
+    const result = await this.web3.eth.ens.setContentHash(
       ens.address,
-      `ipfs://${ens.content_hash}`,
+      ens.content_hash,
       ens.options
     );
     return result;
   }
 
-  private async fromBuffer(chunks): Promise<BufferList> {
+  private async fromBuffer(
+    chunks: AsyncIterable<BufferList>
+  ): Promise<BufferList> {
     const content = new BufferList();
     for await (const chunk of chunks) {
       content.append(chunk);
