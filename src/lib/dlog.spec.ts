@@ -130,12 +130,9 @@ test('put/get author', async t => {
   const dlog = t.context['dlog'];
   const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
   const cid_author = await dlog.putAuthor(author);
-  const author_ipfs_object = await dlog.getAuthor(cid_author.toString());
+  const result_author = await dlog.getAuthor(cid_author.toString());
   t.context['author'] = cid_author;
-  const {
-    value
-  }: { readonly value: { readonly name: string } } = author_ipfs_object;
-  t.is(value.name, author.name);
+  t.is(result_author.name, author.name);
 });
 
 test('put/get article', async t => {
@@ -147,10 +144,9 @@ test('put/get article', async t => {
     []
   );
   const cid_article = await dlog.putArticle(article);
-  const article_ipfs_object = await dlog.getArticle(cid_article.toString());
+  const result_article = await dlog.getArticle(cid_article.toString());
   t.context['article'] = cid_article;
-  const { value }: { readonly value: Article } = article_ipfs_object;
-  t.is(value.content, article.content);
+  t.is(result_article.content, article.content);
 });
 
 test('put/get article summary', async t => {
@@ -163,12 +159,9 @@ test('put/get article summary', async t => {
     'First Title'
   );
   const cid_aso = await dlog.putArticleSummary(article_summary);
-  const aso_ipfs_object = await dlog.getArticleSummary(cid_aso.toString());
+  const result_aso = await dlog.getArticleSummary(cid_aso.toString());
   t.context['aso'] = cid_aso;
-  const {
-    value
-  }: { readonly value: { readonly title: string } } = aso_ipfs_object;
-  t.is(value.title, article_summary.title);
+  t.is(result_aso.title, article_summary.title);
 });
 
 test('put/get bucket', async t => {
@@ -176,9 +169,8 @@ test('put/get bucket', async t => {
   const bucket = new Bucket([]);
   bucket.addArticle(t.context['aso']);
   const cid_aso = await dlog.putBucket(bucket);
-  const bucket_ipfs_object = await dlog.getBucket(cid_aso.toString());
-  const { value }: { readonly value: Bucket } = bucket_ipfs_object;
-  t.is(value.articles[0], bucket.getArticle(0));
+  const result_bucket = await dlog.getBucket(cid_aso.toString());
+  t.is(result_bucket.articles[0], bucket.getArticle(0));
 });
 
 test('put/get identity', async t => {
