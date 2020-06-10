@@ -28,8 +28,8 @@ export class DLog {
   /* Public methods */
 
   public async getAuthor(cid: IPFSPath): Promise<Author> {
-    const author = (await this.get(cid)) as Author;
-    return author;
+    const { value }: { value: Author } = await this.get(cid) as any;
+    return value;
   }
 
   public async putAuthor(author: Author): Promise<IPFSPath> {
@@ -38,8 +38,8 @@ export class DLog {
   }
 
   public async getBucket(cid: IPFSPath): Promise<Bucket> {
-    const bucket = (await this.get(cid)) as Bucket;
-    return bucket;
+    const { value }: { value: Bucket } = await this.get(cid) as any;
+    return value;
   }
 
   public async putBucket(bucket: Bucket): Promise<IPFSPath> {
@@ -72,8 +72,8 @@ export class DLog {
   }
 
   public async getArticleSummary(cid: IPFSPath): Promise<ArticleSummary> {
-    const article_summary = (await this.get(cid)) as ArticleSummary;
-    return article_summary;
+    const { value }: { value: ArticleSummary } = await this.get(cid) as any;
+    return value;
   }
 
   public async putArticleSummary(article: ArticleSummary): Promise<IPFSPath> {
@@ -82,8 +82,8 @@ export class DLog {
   }
 
   public async getArticle(cid: IPFSPath): Promise<Article> {
-    const article = (await this.get(cid)) as Article;
-    return article;
+    const { value }: { value: Article } = await this.get(cid) as any;
+    return value;
   }
 
   public async putArticle(article: Article): Promise<IPFSPath> {
