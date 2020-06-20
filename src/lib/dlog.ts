@@ -64,9 +64,10 @@ export class DLog {
     const bucket_cid = identity.getBucketCID(0);
     const bucket: Bucket = await this.getBucket(bucket_cid);
 
-    if (bucket.size() >= Bucket.BUCKET_LIMIT) {
-      return new Bucket([], bucket_cid);
-    }
+    //TODO: removed this, no need to 
+    // if (bucket.size() >= Bucket.BUCKET_LIMIT) {
+    //   return new Bucket([], bucket_cid);
+    // }
 
     return bucket;
   }
@@ -110,18 +111,85 @@ export class DLog {
       summary: '',
       title: ''
     };
-    // TODO after here make another method to update bucket array in identity object
+
     const article_summary_cid = await this.putArticleSummary(article_summary);
-    const bucket: Bucket = await this.retrieveLatestBucket(ens_address);
-    bucket.addArticle(article_summary_cid);
-    const updated_bucket_cid = await this.putBucket(bucket);
-    console.log('updated_bucket_cid', updated_bucket_cid)
+    
+    let bucket: Bucket = await this.retrieveLatestBucket(ens_address);
+    const [updated_bucket_cid, needArchiving] = await this.addArticletoBucket(article_summary_cid, bucket);
+
+    console.log("new bucket cid: ", updated_bucket_cid, ", needs archiving: ", needArchiving);
+
     // TO DO continue for return
     // have additional method on identity; 
-    // if latest bucket still has place, update recent hash,
-    // if new bucket called, pop last known bucket and unshift new one to the list
   }
 
+  public async addArticletoBucket(article_summary_cid: IPFSPath, bucket: Bucket): Promise<[IPFSPath, boolean]> {
+     var needArchiving: boolean = false;
+     var updated_bucket_cid: IPFSPath;
+
+    if (bucket.size() < bucket.BUCKET_LIMIT) { // If bucket is not full, just add article
+      bucket.addArticle(article_summary_cid);
+      updated_bucket_cid = await this.putBucket(bucket);
+    } else if (bucket.index < bucket.NON_ARCHIVE_LIMIT) {
+      bucket.addArticle(article_summary_cid);
+      let removed_article_summary_cid : IPFSPath = bucket.removeLastArticle();
+
+      if (bucket.previous_bucket == null) {
+        let new_bucket = new Bucket([removed_article_summary_cid], null); 
+        new_bucket.index = bucket.index + 1;
+        let new_bucket_cid = await this.putBucket(new_bucket);
+
+        bucket.previous_bucket = new_bucket_cid;
+      } else {
+        let previous_bucket: Bucket = this.getBucket(bucket.previous_bucket);
+        [bucket.previous_bucket,needArchiving] = this.addArticletoBucket(removed_article_summary_cid, previous_bucket);
+      }
+      
+      if (needArchiving) {
+        bucket = await this.archiving(bucket);
+          updated_bucket_cid = await this.putBucket(bucket);
+      }  
+    } else { // bucket.index == bucket.NON_ARCHIVE_LIMIT
+      // archive bucket
+      bucket.index == -1;
+      bucket.archived = true;
+      updated_bucket_cid = await this.putBucket(bucket);
+      
+      //create new bucket to replace it. It begins with one article, but will be filled in the archiving process
+      let new_bucket = new Bucket([article_summary_cid], updated_bucket_cid); 
+      new_bucket.index = bucket.NON_ARCHIVE_LIMIT;
+
+      return [new_bucket, true];
+    }
+
+    updated_bucket_cid = await this.putBucket(bucket);
+    return [updated_bucket_cid, needArchiving];
+  }
+
+  public async archiving(bucket: Bucket): Promise<Bucket> {
+    let previous_bucket: Bucket = await this.getBucket(bucket.previous_bucket);
+
+    // APBAA = Articles Per Bucket After Archiving
+    let base_APBAA_divisor = bucket.BUCKET_LIMIT - Math.floor((bucket.BUCKET_LIMIT- 1)/bucket.NON_ARCHIVE_LIMIT);
+    let base_APBAA_modulo = (bucket.BUCKET_LIMIT- 1)%bucket.NON_ARCHIVE_LIMIT;
+    
+    let articles_to_pass = base_APBAA_divisor - previous_bucket.size();
+    if (previous_bucket.index <= base_APBAA_modulo)
+      articles_to_pass = articles_to_pass + 1;
+
+    let articles: IPFSPath[] = [];
+
+    let i;
+    for (i=0; i<articles_to_pass; i++)
+      articles[i] = bucket.removeLastArticle();
+
+    previous_bucket.addArticles(articles);
+    let previous_bucket_new_cid = await this.putBucket(previous_bucket);
+    bucket.previous_bucket = previous_bucket_new_cid;
+     
+    return bucket;
+  }
+  
   /**
    *
    * @param content_hash string of CID object
