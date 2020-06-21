@@ -3,10 +3,10 @@ import { IPFSPath } from 'ipfs/types/interface-ipfs-core/common';
 export class Bucket implements Bucket {
   public static readonly BUCKET_LIMIT = 10;
   public static readonly NON_ARCHIVE_LIMIT = 3; // number of non-archived buckets
-  public previous_bucket?: IPFSPath;
-  public index: number; // -1 (if archived), or between 1 and MAX_LIVE_INDEX otherwise
-  public readonly archived: boolean; 
-  public readonly articles: IPFSPath[];
+  private previous_bucket?: IPFSPath;
+  private index!: number; // -1 (if archived), or between 1 and MAX_LIVE_INDEX otherwise
+  // -1 (if archived), or between 1 and MAX_LIVE_INDEX otherwise
+  private articles: IPFSPath[];
 
   constructor(
     articles: IPFSPath[] = [],
@@ -14,7 +14,6 @@ export class Bucket implements Bucket {
   ) {
     this.articles = articles;
     this.previous_bucket = previous_bucket;
-    this.archived = false;
   }
   /**
    *
@@ -24,12 +23,11 @@ export class Bucket implements Bucket {
     this.articles.unshift(article_summary_cid);
   }
 
-   /**
-    * @param {IPFSPath[]} array of article summary CIDs
-    */
+  /**
+   * @param {IPFSPath[]} array of article summary CIDs
+   */
   public addArticles(article_summary_CIDs: IPFSPath[]): void {
-    let i;
-    for (i = 0; i < article_summary_CIDs.length; i++) { 
+    for (let i = 0; i < article_summary_CIDs.length; i++) {
       this.articles.unshift(article_summary_CIDs[i]);
     }
   }
@@ -47,7 +45,7 @@ export class Bucket implements Bucket {
    * @param removes the last article and returns its CID
    */
   public removeLastArticle(): IPFSPath {
-    return this.articles.pop();
+    return this.articles.pop() as IPFSPath;
   }
 
   /**
@@ -57,4 +55,19 @@ export class Bucket implements Bucket {
     return this.articles.length;
   }
 
+  public setPreviousBucket(cid: IPFSPath): void {
+    this.previous_bucket = cid;
+  }
+
+  public getPreviousBucket(): IPFSPath | undefined {
+    return this.previous_bucket;
+  }
+
+  public getIndex(): number {
+    return this.index;
+  }
+
+  public setIndex(number: number): void {
+    this.index = number;
+  }
 }

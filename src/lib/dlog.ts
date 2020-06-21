@@ -28,7 +28,7 @@ export class DLog {
   /* Public methods */
 
   public async getAuthor(cid: IPFSPath): Promise<Author> {
-    const { value }: { value: Author } = await this.get(cid) as any;
+    const { value }: { value: Author } = (await this.get(cid)) as any;
     return value;
   }
 
@@ -38,7 +38,7 @@ export class DLog {
   }
 
   public async getBucket(cid: IPFSPath): Promise<Bucket> {
-    const { value }: { value: Bucket } = await this.get(cid) as any;
+    const { value }: { value: Bucket } = (await this.get(cid)) as any;
     return value;
   }
 
@@ -64,7 +64,7 @@ export class DLog {
     const bucket_cid = identity.getBucketCID(0);
     const bucket: Bucket = await this.getBucket(bucket_cid);
 
-    //TODO: removed this, no need to 
+    //TODO: removed this, no need to
     // if (bucket.size() >= Bucket.BUCKET_LIMIT) {
     //   return new Bucket([], bucket_cid);
     // }
@@ -73,7 +73,7 @@ export class DLog {
   }
 
   public async getArticleSummary(cid: IPFSPath): Promise<ArticleSummary> {
-    const { value }: { value: ArticleSummary } = await this.get(cid) as any;
+    const { value }: { value: ArticleSummary } = (await this.get(cid)) as any;
     return value;
   }
 
@@ -83,7 +83,7 @@ export class DLog {
   }
 
   public async getArticle(cid: IPFSPath): Promise<Article> {
-    const { value }: { value: Article } = await this.get(cid) as any;
+    const { value }: { value: Article } = (await this.get(cid)) as any;
     return value;
   }
 
@@ -113,53 +113,71 @@ export class DLog {
     };
 
     const article_summary_cid = await this.putArticleSummary(article_summary);
-    
-    let bucket: Bucket = await this.retrieveLatestBucket(ens_address);
-    const [updated_bucket_cid, needArchiving] = await this.addArticletoBucket(article_summary_cid, bucket);
 
-    console.log("new bucket cid: ", updated_bucket_cid, ", needs archiving: ", needArchiving);
+    let bucket: Bucket = await this.retrieveLatestBucket(ens_address);
+    const [updated_bucket_cid, needArchiving] = await this.addArticleToBucket(
+      article_summary_cid,
+      bucket
+    );
+
+    console.log(
+      'new bucket cid: ',
+      updated_bucket_cid,
+      ', needs archiving: ',
+      needArchiving
+    );
 
     // TO DO continue for return
-    // have additional method on identity; 
+    // have additional method on identity;
   }
 
-  public async addArticletoBucket(article_summary_cid: IPFSPath, bucket: Bucket): Promise<[IPFSPath, boolean]> {
-     var needArchiving: boolean = false;
-     var updated_bucket_cid: IPFSPath;
+  public async addArticleToBucket(
+    article_summary_cid: IPFSPath,
+    bucket: Bucket
+  ): Promise<[IPFSPath, boolean]> {
+    let needArchiving: boolean = false;
+    let updated_bucket_cid: IPFSPath;
+    let bucket_index = bucket.getIndex();
 
-    if (bucket.size() < bucket.BUCKET_LIMIT) { // If bucket is not full, just add article
+    if (bucket.size() < Bucket.BUCKET_LIMIT) {
+      // If bucket is not full, just add article
       bucket.addArticle(article_summary_cid);
-      updated_bucket_cid = await this.putBucket(bucket);
-    } else if (bucket.index < bucket.NON_ARCHIVE_LIMIT) {
+    } else if (bucket_index < Bucket.NON_ARCHIVE_LIMIT) {
       bucket.addArticle(article_summary_cid);
-      let removed_article_summary_cid : IPFSPath = bucket.removeLastArticle();
-
-      if (bucket.previous_bucket == null) {
-        let new_bucket = new Bucket([removed_article_summary_cid], null); 
-        new_bucket.index = bucket.index + 1;
+      let removed_article_summary_cid: IPFSPath = bucket.removeLastArticle();
+      let previous_bucket_cid = bucket.getPreviousBucket();
+      if (!previous_bucket_cid) {
+        let new_bucket = new Bucket([removed_article_summary_cid], null);
+        new_bucket.setIndex(bucket_index + 1);
         let new_bucket_cid = await this.putBucket(new_bucket);
 
-        bucket.previous_bucket = new_bucket_cid;
+        bucket.setPreviousBucket(new_bucket_cid);
       } else {
-        let previous_bucket: Bucket = this.getBucket(bucket.previous_bucket);
-        [bucket.previous_bucket,needArchiving] = this.addArticletoBucket(removed_article_summary_cid, previous_bucket);
+        let previous_bucket: Bucket = await this.getBucket(previous_bucket_cid);
+        [previous_bucket_cid, needArchiving] = await this.addArticleToBucket(
+          removed_article_summary_cid,
+          previous_bucket
+        );
+        bucket.setPreviousBucket(previous_bucket_cid);
       }
-      
+
       if (needArchiving) {
         bucket = await this.archiving(bucket);
-          updated_bucket_cid = await this.putBucket(bucket);
-      }  
-    } else { // bucket.index == bucket.NON_ARCHIVE_LIMIT
+      }
+    } else {
+      // bucket.index == bucket.NON_ARCHIVE_LIMIT
       // archive bucket
-      bucket.index == -1;
-      bucket.archived = true;
+      bucket.setIndex(-1);
       updated_bucket_cid = await this.putBucket(bucket);
-      
-      //create new bucket to replace it. It begins with one article, but will be filled in the archiving process
-      let new_bucket = new Bucket([article_summary_cid], updated_bucket_cid); 
-      new_bucket.index = bucket.NON_ARCHIVE_LIMIT;
 
-      return [new_bucket, true];
+      //create new bucket to replace it. It begins with one article, but will be filled in the archiving process
+      let new_bucket = new Bucket([article_summary_cid], updated_bucket_cid);
+      new_bucket.setIndex(Bucket.NON_ARCHIVE_LIMIT);
+      const new_bucket_cid: IPFSPath = (updated_bucket_cid = await this.putBucket(
+        bucket
+      ));
+
+      return [new_bucket_cid, true];
     }
 
     updated_bucket_cid = await this.putBucket(bucket);
@@ -167,29 +185,33 @@ export class DLog {
   }
 
   public async archiving(bucket: Bucket): Promise<Bucket> {
-    let previous_bucket: Bucket = await this.getBucket(bucket.previous_bucket);
+    let previous_bucket: Bucket = await this.getBucket(
+      bucket.getPreviousBucket() as IPFSPath
+    );
 
     // APBAA = Articles Per Bucket After Archiving
-    let base_APBAA_divisor = bucket.BUCKET_LIMIT - Math.floor((bucket.BUCKET_LIMIT- 1)/bucket.NON_ARCHIVE_LIMIT);
-    let base_APBAA_modulo = (bucket.BUCKET_LIMIT- 1)%bucket.NON_ARCHIVE_LIMIT;
-    
+    let base_APBAA_divisor =
+      Bucket.BUCKET_LIMIT -
+      Math.floor((Bucket.BUCKET_LIMIT - 1) / Bucket.NON_ARCHIVE_LIMIT);
+    let base_APBAA_modulo =
+      (Bucket.BUCKET_LIMIT - 1) % Bucket.NON_ARCHIVE_LIMIT;
+
     let articles_to_pass = base_APBAA_divisor - previous_bucket.size();
-    if (previous_bucket.index <= base_APBAA_modulo)
+    if (previous_bucket.getIndex() <= base_APBAA_modulo)
       articles_to_pass = articles_to_pass + 1;
 
     let articles: IPFSPath[] = [];
 
-    let i;
-    for (i=0; i<articles_to_pass; i++)
+    for (let i = 0; i < articles_to_pass; i++)
       articles[i] = bucket.removeLastArticle();
 
     previous_bucket.addArticles(articles);
     let previous_bucket_new_cid = await this.putBucket(previous_bucket);
-    bucket.previous_bucket = previous_bucket_new_cid;
-     
+    bucket.setPreviousBucket(previous_bucket_new_cid);
+
     return bucket;
   }
-  
+
   /**
    *
    * @param content_hash string of CID object
