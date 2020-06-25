@@ -9,26 +9,9 @@ import IPFS from 'ipfs';
 import namehash from 'eth-ens-namehash';
 import Web3 from 'web3';
 import { DLog } from './dlog';
-import { Article, ArticleSummary, Author, Bucket, Identity } from './models';
+import { Article, ArticleSummary, Author, Bucket, Identity} from './models';
 
 const ganache = require('ganache-core');
-
-function getBytes32FromIpfsHash(hash: string) {
-  return `0x${bs58
-    .decode(hash)
-    .slice(2)
-    .toString('hex')}`;
-}
-
-function getIpfsHashFromBytes32(bytes32Hex) {
-  // Add our default ipfs values for first 2 bytes:
-  // function:0x12=sha2, size:0x20=256 bits
-  // and cut off leading "0x"
-  const hashHex = '1220' + bytes32Hex.slice(2);
-  const hashBytes = Buffer.from(hashHex, 'hex');
-  const hashStr = bs58.encode(hashBytes);
-  return hashStr;
-}
 
 function getRootNodeFromTLD(web3, tld) {
   return {
@@ -131,14 +114,16 @@ test('put/get author', async t => {
   const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
   const cid_author = await dlog.putAuthor(author);
   const result_author = await dlog.getAuthor(cid_author.toString());
-  t.context['author'] = cid_author;
+  t.context['cid_author'] = cid_author;
+  t.context['author'] = author;
   t.is(result_author.name, author.name);
 });
 
 test('put/get article', async t => {
   const dlog = t.context['dlog'];
+  const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
   const article = new Article(
-    [t.context['author'], { name: 'mdt' }],
+    author,
     'Test',
     'base64_img',
     []
@@ -151,26 +136,92 @@ test('put/get article', async t => {
 
 test('put/get article summary', async t => {
   const dlog = t.context['dlog'];
+  const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
+  const article = new Article(
+    author,
+    'Test',
+    'base64_img',
+    []
+  );
+  const cid_article = await dlog.putArticle(article);
+
   const article_summary = new ArticleSummary(
-    t.context['author'],
-    t.context['article'],
+    author,
+    cid_article,
     'base64_img',
     'Test',
     'First Title'
   );
-  const cid_aso = await dlog.putArticleSummary(article_summary);
-  const result_aso = await dlog.getArticleSummary(cid_aso.toString());
-  t.context['aso'] = cid_aso;
+  const cid_AS = await dlog.putArticleSummary(article_summary);
+  const result_aso = await dlog.getArticleSummary(cid_AS.toString());
+  t.context['AS'] = cid_AS;
   t.is(result_aso.title, article_summary.title);
+});
+
+test('test archiving', async t => {
+  const ARTICLES_TO_PUSH = 31;
+  const dlog = t.context['dlog'];
+  const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
+
+  const article = new Article(
+    author,
+    'Test',
+    'base64_img',
+    []
+  );
+  const cid_article = await dlog.putArticle(article);
+
+  const article_summary = new ArticleSummary(
+    author,
+    cid_article,
+    'base64_img',
+    'Test',
+    'First Title'
+  );
+  const cid_AS = await dlog.putArticleSummary(article_summary);
+
+  const bucket = new Bucket([]);
+  bucket.setIndex(1);
+
+  // push many articles to test archiving
+  let i;
+  for (i=1; i<=ARTICLES_TO_PUSH; i++) {
+    var [new_bucket_cid, archiving] = await dlog.addArticleToBucket(cid_AS, bucket);
+    let temp_bucket = await dlog.getBucket(new_bucket_cid.toString()) as Bucket;
+    bucket.loadBucket(temp_bucket);
+  }
+
+  t.is(bucket.size(), 7);
+  t.is(archiving, true);
 });
 
 test('put/get bucket', async t => {
   const dlog = t.context['dlog'];
+  const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
+  const article = new Article(
+    author,
+    'Test',
+    'base64_img',
+    []
+  );
+  const cid_article = await dlog.putArticle(article);
+
+  const article_summary = new ArticleSummary(
+    author,
+    cid_article,
+    'base64_img',
+    'Test',
+    'First Title'
+  );
+  const cid_AS = await dlog.putArticleSummary(article_summary);
+
   const bucket = new Bucket([]);
-  bucket.addArticle(t.context['aso']);
-  const cid_aso = await dlog.putBucket(bucket);
-  const result_bucket = await dlog.getBucket(cid_aso.toString());
-  t.is(result_bucket.articles[0], bucket.getArticle(0));
+  bucket.addArticle(cid_AS);
+  const cid_bucket = await dlog.putBucket(bucket);
+  let result_bucket = new Bucket([]);
+  let temp_bucket = await dlog.getBucket(cid_bucket.toString()) as Bucket;
+  result_bucket.loadBucket(temp_bucket);
+  t.deepEqual(result_bucket.getArticle(0), bucket.getArticle(0));
 });
 
 test('put/get identity', async t => {
@@ -204,3 +255,24 @@ test('register', async t => {
   const retrieved_identity = await dlog.retrieveIdentity(content_hash);
   t.is(retrieved_identity.author.toString(), identity.author.toString());
 });
+
+
+/**
+ * Auxiliary functions
+ */
+function getBytes32FromIpfsHash(hash: string) {
+  return `0x${bs58
+    .decode(hash)
+    .slice(2)
+    .toString('hex')}`;
+}
+
+function getIpfsHashFromBytes32(bytes32Hex) {
+  // Add our default ipfs values for first 2 bytes:
+  // function:0x12=sha2, size:0x20=256 bits
+  // and cut off leading "0x"
+  const hashHex = '1220' + bytes32Hex.slice(2);
+  const hashBytes = Buffer.from(hashHex, 'hex');
+  const hashStr = bs58.encode(hashBytes);
+  return hashStr;
+}

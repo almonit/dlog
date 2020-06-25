@@ -70,4 +70,11 @@ export class Bucket implements Bucket {
   public setIndex(number: number): void {
     this.index = number;
   }
+
+  public loadBucket(bucket: Bucket): void {
+    this.articles = bucket.articles;
+    this.previous_bucket = bucket.previous_bucket;
+    if (bucket.index)
+      this.index = bucket.index;
+  }
 }

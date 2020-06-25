@@ -146,14 +146,16 @@ export class DLog {
       bucket.addArticle(article_summary_cid);
       let removed_article_summary_cid: IPFSPath = bucket.removeLastArticle();
       let previous_bucket_cid = bucket.getPreviousBucket();
-      if (!previous_bucket_cid) {
+      if (previous_bucket_cid == null) {
         let new_bucket = new Bucket([removed_article_summary_cid], null);
         new_bucket.setIndex(bucket_index + 1);
         let new_bucket_cid = await this.putBucket(new_bucket);
 
         bucket.setPreviousBucket(new_bucket_cid);
       } else {
-        let previous_bucket: Bucket = await this.getBucket(previous_bucket_cid);
+        let previous: Bucket = await this.getBucket(previous_bucket_cid);
+        let previous_bucket = new Bucket([]);
+        previous_bucket.loadBucket(previous);
         [previous_bucket_cid, needArchiving] = await this.addArticleToBucket(
           removed_article_summary_cid,
           previous_bucket
@@ -174,8 +176,9 @@ export class DLog {
       let new_bucket = new Bucket([article_summary_cid], updated_bucket_cid);
       new_bucket.setIndex(Bucket.NON_ARCHIVE_LIMIT);
       const new_bucket_cid: IPFSPath = (updated_bucket_cid = await this.putBucket(
-        bucket
+        new_bucket
       ));
+
 
       return [new_bucket_cid, true];
     }
@@ -185,9 +188,11 @@ export class DLog {
   }
 
   public async archiving(bucket: Bucket): Promise<Bucket> {
-    let previous_bucket: Bucket = await this.getBucket(
+    let previous: Bucket = await this.getBucket(
       bucket.getPreviousBucket() as IPFSPath
     );
+    let previous_bucket = new Bucket([]);
+    previous_bucket.loadBucket(previous);
 
     // APBAA = Articles Per Bucket After Archiving
     let base_APBAA_divisor =
