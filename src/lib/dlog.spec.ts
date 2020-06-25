@@ -106,7 +106,7 @@ test('verify version', async t => {
   const dlog = t.context['dlog'];
   const version = await dlog.version();
   console.log('version', version);
-  t.is(version.dlog, '0.0.1');
+  t.is(version.dlog, '1.0.0');
 });
 
 test('put/get author', async t => {

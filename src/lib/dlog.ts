@@ -315,7 +315,10 @@ export class DLog {
     readonly dlog: string;
   }> {
     const ipfs_version = await this.node.version();
-    return { ipfs: ipfs_version, dlog: '0.0.1' }; // TO DO get version from manifest
+    var pjson = require('../../../package.json');
+    console.log(typeof(pjson.version));
+    let ver: string = pjson.version;
+    return { ipfs: ipfs_version, dlog: ver }; 
   }
 
   private async get(cid: IPFSPath): Promise<object> {
