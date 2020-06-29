@@ -317,8 +317,7 @@ export class DLog {
     const ipfs_version = await this.node.version();
     var pjson = require('../../../package.json');
     console.log(typeof(pjson.version));
-    let ver: string = pjson.version;
-    return { ipfs: ipfs_version, dlog: ver }; 
+    return { ipfs: ipfs_version, dlog: pjson.version };
   }
 
   private async get(cid: IPFSPath): Promise<object> {
