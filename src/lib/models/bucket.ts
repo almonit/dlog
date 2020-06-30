@@ -74,7 +74,7 @@ export class Bucket implements Bucket {
   public loadBucket(bucket: Bucket): void {
     this.articles = bucket.articles;
     this.previous_bucket = bucket.previous_bucket;
-    if (bucket.index)
+    if (bucket.index >= -1)
       this.index = bucket.index;
   }
 }
