@@ -1,12 +1,12 @@
 pragma solidity ^0.6.10;
 
-import "@ensdomains/ethregistrar/contracts/BaseRegistrar.sol";
+import "https://github.com/ensdomains/ethregistrar/blob/master/contracts/BaseRegistrar.sol";
 
 contract Alpress {
     string constant platform = "alpress";
     bytes32 constant public TLD_NODE = 0x93cdeb708b7545dc668eb9280176169d1c33cfd8ed6f04690a0bcc88a93fc4ae; // namehash('eth')
     address resolver = "0x4976fb03C32e5B8cfe2b6cCB31c09Ba78EBaBa41"; // ENS standard resolver
-    address almonit = '0xC741cdDa197Af87Acd54a4A5f563C8efDbc754B7' // Almonit multisig account
+    address almonit = '0xC741cdDa197Af87Acd54a4A5f563C8efDbc754B7'; // Almonit multisig account
     
     modifier almonit_only {
         if(msg.sender != almonit) throw;
@@ -54,7 +54,7 @@ contract Alpress {
         blog.owner = msg.sender;
         
         //register for one year "approximately" (assuming accurate block time disregarding leap years)
-        blog.expirationBlock = now + 365*days; 
+        blog.expirationBlock = now + 365 days; 
 
         emit NewRegistration(label, name);
     }
@@ -122,8 +122,7 @@ contract Alpress {
     }
     
     function setDefaultResolver(address memory resolver) almonit_only {
-        
-        resolver = newResolver
+        resolver = newResolver;
     }
     
     /**
@@ -134,7 +133,7 @@ contract Alpress {
         
         bytes32 label = keccak256(bytes(name));
         
-        if ( (blogs[label].owner !==== address(0)) && (blogs[label].expirationBlock < now) )
+        if ( (blogs[label].owner != address(0)) && (blogs[label].expirationBlock < now) )
             taken = true;
     }
     
@@ -145,7 +144,7 @@ contract Alpress {
         
         if (checkTaken(string)) {
             bytes32 label = keccak256(bytes(name));
-            owner = blogs[label].owner
+            owner = blogs[label].owner;
         }
     }
     
@@ -159,4 +158,3 @@ contract Alpress {
         }
     }
 }
-
