@@ -1,7 +1,8 @@
+import { Author } from './';
 import { IPFSPath } from 'ipfs/types/interface-ipfs-core/common';
 
-export class Article implements Article {
-  public readonly author: ReadonlyArray<readonly [IPFSPath, JSON]>;
+export class Article {
+  public readonly author: Author;
   public readonly content: string;
   public readonly cover_image: string;
   public readonly tags: ReadonlyArray<
@@ -9,7 +10,7 @@ export class Article implements Article {
   >;
 
   constructor(
-    author: ReadonlyArray<readonly [IPFSPath, JSON]>,
+    author: Author,
     content: string,
     cover_image: string,
     tags: ReadonlyArray<readonly [readonly IPFSPath[], readonly string[]]>
