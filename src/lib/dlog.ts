@@ -64,11 +64,6 @@ export class DLog {
     const bucket_cid = identity.getBucketCID(0);
     const bucket: Bucket = await this.getBucket(bucket_cid);
 
-    //TODO: removed this, no need to
-    // if (bucket.size() >= Bucket.BUCKET_LIMIT) {
-    //   return new Bucket([], bucket_cid);
-    // }
-
     return bucket;
   }
 
