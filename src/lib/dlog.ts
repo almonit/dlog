@@ -115,16 +115,16 @@ export class DLog {
     const article_summary_cid = await this.putArticleSummary(article_summary);
 
     let bucket: Bucket = await this.retrieveLatestBucket(ens_address);
-    const [updated_bucket_cid, needArchiving] = await this.addArticleToBucket(
+    const [updated_bucket_cid, need_archiving] = await this.addArticleToBucket(
       article_summary_cid,
       bucket
     );
 
-    console.log(
+    console.info(
       'new bucket cid: ',
       updated_bucket_cid,
       ', needs archiving: ',
-      needArchiving
+      need_archiving
     );
 
     // TO DO continue for return
@@ -135,7 +135,7 @@ export class DLog {
     article_summary_cid: IPFSPath,
     bucket: Bucket
   ): Promise<[IPFSPath, boolean]> {
-    let needArchiving: boolean = false;
+    let need_archiving: boolean = false;
     let updated_bucket_cid: IPFSPath;
     let bucket_index = bucket.getIndex();
 
@@ -156,14 +156,14 @@ export class DLog {
         let previous: Bucket = await this.getBucket(previous_bucket_cid);
         let previous_bucket = new Bucket([]);
         previous_bucket.loadBucket(previous);
-        [previous_bucket_cid, needArchiving] = await this.addArticleToBucket(
+        [previous_bucket_cid, need_archiving] = await this.addArticleToBucket(
           removed_article_summary_cid,
           previous_bucket
         );
         bucket.setPreviousBucket(previous_bucket_cid);
       }
 
-      if (needArchiving) {
+      if (need_archiving) {
         bucket = await this.archiving(bucket);
       }
     } else {
@@ -179,12 +179,11 @@ export class DLog {
         new_bucket
       ));
 
-
       return [new_bucket_cid, true];
     }
 
     updated_bucket_cid = await this.putBucket(bucket);
-    return [updated_bucket_cid, needArchiving];
+    return [updated_bucket_cid, need_archiving];
   }
 
   public async archiving(bucket: Bucket): Promise<Bucket> {
@@ -316,8 +315,8 @@ export class DLog {
   }> {
     const ipfs_version = await this.node.version();
     var pjson = require('../../../package.json');
-    console.log(typeof(pjson.version));
-    return { ipfs: ipfs_version, dlog: pjson.version };
+    let dlog_version: string = pjson.version;
+    return { ipfs: ipfs_version, dlog: dlog_version };
   }
 
   private async get(cid: IPFSPath): Promise<object> {

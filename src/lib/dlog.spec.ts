@@ -9,7 +9,7 @@ import IPFS from 'ipfs';
 import namehash from 'eth-ens-namehash';
 import Web3 from 'web3';
 import { DLog } from './dlog';
-import { Article, ArticleSummary, Author, Bucket, Identity} from './models';
+import { Article, ArticleSummary, Author, Bucket, Identity } from './models';
 
 const ganache = require('ganache-core');
 
@@ -122,12 +122,7 @@ test('put/get author', async t => {
 test('put/get article', async t => {
   const dlog = t.context['dlog'];
   const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
-  const article = new Article(
-    author,
-    'Test',
-    'base64_img',
-    []
-  );
+  const article = new Article(author, 'Test', 'base64_img', []);
   const cid_article = await dlog.putArticle(article);
   const result_article = await dlog.getArticle(cid_article.toString());
   t.context['article'] = cid_article;
@@ -137,12 +132,7 @@ test('put/get article', async t => {
 test('put/get article summary', async t => {
   const dlog = t.context['dlog'];
   const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
-  const article = new Article(
-    author,
-    'Test',
-    'base64_img',
-    []
-  );
+  const article = new Article(author, 'Test', 'base64_img', []);
   const cid_article = await dlog.putArticle(article);
 
   const article_summary = new ArticleSummary(
@@ -163,12 +153,7 @@ test('test archiving', async t => {
   const dlog = t.context['dlog'];
   const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
 
-  const article = new Article(
-    author,
-    'Test',
-    'base64_img',
-    []
-  );
+  const article = new Article(author, 'Test', 'base64_img', []);
   const cid_article = await dlog.putArticle(article);
 
   const article_summary = new ArticleSummary(
@@ -184,10 +169,14 @@ test('test archiving', async t => {
   bucket.setIndex(1);
 
   // push many articles to test archiving
-  let i;
-  for (i=1; i<=ARTICLES_TO_PUSH; i++) {
-    var [new_bucket_cid, archiving] = await dlog.addArticleToBucket(cid_AS, bucket);
-    let temp_bucket = await dlog.getBucket(new_bucket_cid.toString()) as Bucket;
+  for (let i = 1; i <= ARTICLES_TO_PUSH; i++) {
+    var [new_bucket_cid, archiving] = await dlog.addArticleToBucket(
+      cid_AS,
+      bucket
+    );
+    let temp_bucket = (await dlog.getBucket(
+      new_bucket_cid.toString()
+    )) as Bucket;
     bucket.loadBucket(temp_bucket);
   }
 
@@ -198,12 +187,7 @@ test('test archiving', async t => {
 test('put/get bucket', async t => {
   const dlog = t.context['dlog'];
   const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
-  const article = new Article(
-    author,
-    'Test',
-    'base64_img',
-    []
-  );
+  const article = new Article(author, 'Test', 'base64_img', []);
   const cid_article = await dlog.putArticle(article);
 
   const article_summary = new ArticleSummary(
@@ -219,7 +203,7 @@ test('put/get bucket', async t => {
   bucket.addArticle(cid_AS);
   const cid_bucket = await dlog.putBucket(bucket);
   let result_bucket = new Bucket([]);
-  let temp_bucket = await dlog.getBucket(cid_bucket.toString()) as Bucket;
+  let temp_bucket = (await dlog.getBucket(cid_bucket.toString())) as Bucket;
   result_bucket.loadBucket(temp_bucket);
   t.deepEqual(result_bucket.getArticle(0), bucket.getArticle(0));
 });
@@ -255,7 +239,6 @@ test('register', async t => {
   const retrieved_identity = await dlog.retrieveIdentity(content_hash);
   t.is(retrieved_identity.author.toString(), identity.author.toString());
 });
-
 
 /**
  * Auxiliary functions
