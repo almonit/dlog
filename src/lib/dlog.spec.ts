@@ -5,6 +5,7 @@ import test from 'ava';
 import bs58 from 'bs58';
 import { ENSRegistry, FIFSRegistrar } from '@ensdomains/ens';
 import { PublicResolver } from '@ensdomains/resolver';
+import { AlpressRegistrar } from '../contracts';
 import IPFS from 'ipfs';
 import namehash from 'eth-ens-namehash';
 import Web3 from 'web3';
@@ -34,8 +35,8 @@ test.before(async t => {
     // 'https://:62ff7188c74447b6a67afbc2de247610@ropsten.infura.io/v3/372375d582d843c48a4eaee6aa5c1b3a'
   );
 
-  const addressLabel = web3.utils.sha3('mdtsomething');
-  const address = namehash.hash('mdtsomething.eth');
+  const address_label = web3.utils.sha3('alpress');
+  const address = namehash.hash('alpress.eth');
   const rootNode = getRootNodeFromTLD(web3, 'eth');
   const accounts = await web3.eth.getAccounts();
   const main_account = accounts[0];
@@ -73,6 +74,20 @@ test.before(async t => {
     })
     .send(send_options);
 
+  const instanceAlpressRegistrar = new web3.eth.Contract(
+    AlpressRegistrar.abi as any
+  );
+  const contractAlpressRegistrar = await instanceAlpressRegistrar
+    .deploy({
+      data: AlpressRegistrar.bytecode,
+      arguments: [
+        contractRegistry.options.address,
+        contractTestRegistrar.options.address,
+        main_account
+      ]
+    })
+    .send(send_options);
+
   await contractRegistry.methods
     .setSubnodeOwner(
       '0x0000000000000000000000000000000000000000',
@@ -85,7 +100,7 @@ test.before(async t => {
   console.info('owner', owner);
   if (owner === '0x0000000000000000000000000000000000000000') {
     await contractTestRegistrar.methods
-      .register(addressLabel, main_account)
+      .register(address_label, main_account)
       .send(send_options);
 
     await contractRegistry.methods
@@ -97,9 +112,11 @@ test.before(async t => {
     address: address,
     account: main_account,
     resolver: resolverMethods,
-    sendOptions: send_options
+    sendOptions: send_options,
+    web3: web3
   };
   t.context['dlog'] = new DLog(ipfs, web3);
+  t.context['alpress'] = contractAlpressRegistrar;
 });
 
 test('verify version', async t => {
@@ -238,6 +255,26 @@ test('register', async t => {
   const content_hash = getIpfsHashFromBytes32(content);
   const retrieved_identity = await dlog.retrieveIdentity(content_hash);
   t.is(retrieved_identity.author.toString(), identity.author.toString());
+});
+
+test('Alpress Contract > non-allocated address', async t => {
+  const contract = t.context['alpress'];
+  const ownerResult = await contract.methods.checkOwner('mdt').call();
+  t.is(ownerResult, '0x0000000000000000000000000000000000000000');
+});
+
+test('Alpress Contract > buy', async t => {
+  const contract = t.context['alpress'];
+  const { sendOptions, web3 } = t.context['ens'];
+
+  await contract.methods.buy('mdt').send({
+    ...sendOptions,
+    value: web3.utils.toWei('0.005', 'ether')
+  });
+
+  const takenResult = await contract.methods.checkTaken('mdt').call();
+
+  t.is(takenResult, true);
 });
 
 /**
