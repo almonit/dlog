@@ -14,13 +14,6 @@ import { Article, ArticleSummary, Author, Bucket, Identity } from './models';
 
 const ganache = require('ganache-core');
 
-function getRootNodeFromTLD(web3, tld) {
-  return {
-    namehash: namehash.hash(tld),
-    sha3: web3.utils.sha3(tld)
-  };
-}
-
 test.before(async t => {
   const repoPath = 'repo/ipfs-' + Math.random();
   const ipfs = await IPFS.create({ repo: repoPath });
@@ -74,19 +67,19 @@ test.before(async t => {
     })
     .send(send_options);
 
-  const instanceAlpressRegistrar = new web3.eth.Contract(
-    AlpressRegistrar.abi as any
-  );
-  const contractAlpressRegistrar = await instanceAlpressRegistrar
-    .deploy({
-      data: AlpressRegistrar.bytecode,
-      arguments: [
-        contractRegistry.options.address,
-        contractTestRegistrar.options.address,
-        main_account
-      ]
-    })
-    .send(send_options);
+    const instanceAlpressRegistrar = new web3.eth.Contract(
+      AlpressRegistrar.abi as any
+    );
+    const contractAlpressRegistrar = await instanceAlpressRegistrar
+      .deploy({
+        data: AlpressRegistrar.bytecode,
+        arguments: [
+          contractRegistry.options.address,
+          contractTestRegistrar.options.address,
+          contractTestRegistrar.options.address
+        ]
+      })
+      .send(send_options);
 
   await contractRegistry.methods
     .setSubnodeOwner(
@@ -97,7 +90,7 @@ test.before(async t => {
     .send(send_options);
 
   const owner = await contractRegistry.methods.owner(address).call();
-  console.info('owner', owner);
+
   if (owner === '0x0000000000000000000000000000000000000000') {
     await contractTestRegistrar.methods
       .register(address_label, main_account)
@@ -111,6 +104,7 @@ test.before(async t => {
   t.context['ens'] = {
     address: address,
     account: main_account,
+    registry: contractRegistry.methods,
     resolver: resolverMethods,
     sendOptions: send_options,
     web3: web3
@@ -263,23 +257,69 @@ test('Alpress Contract > non-allocated address', async t => {
   t.is(ownerResult, '0x0000000000000000000000000000000000000000');
 });
 
+test('Alpress Contract > non-allocated taken check', async t => {
+  const contract = t.context['alpress'];
+  const takenResult = await contract.methods.checkTaken('mdt').call();
+  t.is(takenResult, false);
+});
+
+test('Alpress Contract > non-allocated expiration', async t => {
+  const contract = t.context['alpress'];
+
+  await contract.methods
+    .checkExpiration('mdt')
+    .call();
+
+  const expirationResult = await contract.methods.checkExpiration('mdt').call();
+
+  t.is(expirationResult, '0');
+});
+
 test('Alpress Contract > buy', async t => {
   const contract = t.context['alpress'];
-  const { sendOptions, web3 } = t.context['ens'];
+  const { address, registry, sendOptions, web3 } = t.context['ens'];
+
+  await registry
+      .setOwner(address, contract.options.address)
+      .send(sendOptions);
 
   await contract.methods.buy('mdt').send({
     ...sendOptions,
     value: web3.utils.toWei('0.005', 'ether')
   });
+  t.pass();
+});
 
+test('Alpress Contract > allocated address', async t => {
+  const contract = t.context['alpress'];
+  const { account } = t.context['ens'];
+  const ownerResult = await contract.methods.checkOwner('mdt').call();
+  t.is(ownerResult, account);
+});
+
+test('Alpress Contract > allocated taken check', async t => {
+  const contract = t.context['alpress'];
   const takenResult = await contract.methods.checkTaken('mdt').call();
-
   t.is(takenResult, true);
+});
+
+test('Alpress Contract > allocated expiration', async t => {
+  const contract = t.context['alpress'];
+  const expirationResult = await contract.methods.checkExpiration('mdt').call();
+  t.not(expirationResult, '0');
 });
 
 /**
  * Auxiliary functions
  */
+
+function getRootNodeFromTLD(web3, tld) {
+  return {
+    namehash: namehash.hash(tld),
+    sha3: web3.utils.sha3(tld)
+  };
+}
+
 function getBytes32FromIpfsHash(hash: string) {
   return `0x${bs58
     .decode(hash)

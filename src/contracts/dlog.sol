@@ -1,18 +1,19 @@
 pragma solidity >=0.6.10;
 
+import './ENS.sol';
 import './FIFSRegistrar.sol';
 import './Resolver.sol';
 
 // SPDX-License-Identifier: GPL
 contract Alpress {
-    string constant platform = 'alpress';
+    bytes32 constant platform = keccak256(bytes('alpress')); //TODO hardcode maybe?
     bytes32 public constant TLD_NODE = 0x93cdeb708b7545dc668eb9280176169d1c33cfd8ed6f04690a0bcc88a93fc4ae; // namehash('eth')
-    address resolver = 0x4976fb03C32e5B8cfe2b6cCB31c09Ba78EBaBa41; // ENS standard resolver
+    address resolver; // ENS standard resolver
     address almonit;
     //address almonit = 0xC741cdDa197Af87Acd54a4A5f563C8efDbc754B7; // Almonit multisig account
 
     modifier almonit_only {
-        if (msg.sender != almonit) revert('Access denied');
+        require(msg.sender == almonit, 'Access denied');
         _;
     }
 
@@ -30,10 +31,11 @@ contract Alpress {
     ENS public ens;
     Resolver public publicResolver;
 
-    constructor(ENS _ens, Resolver _publicResolver, address _owner) public {
+    constructor(ENS _ens, Resolver _publicResolver, address _resolver) public {
         ens = _ens;
         publicResolver = _publicResolver;
-        almonit = _owner;
+        resolver = _resolver;
+        almonit = msg.sender;
     }
 
     function buy(string calldata name) external payable {
@@ -119,10 +121,8 @@ contract Alpress {
         bytes32 blogNode = keccak256(abi.encodePacked(platformNode, label));
         // Set the subdomain's resolver
         ens.setResolver(blogNode, resolver);
-
         // Set the address record on the resolver
-        publicResolver.setAddr(blogNode, address(0));
-
+        // publicResolver.setAddr(blogNode, address(0)); TODO fix it
         // Pass ownership of the new subdomain to the registrant
         ens.setOwner(blogNode, subOwner);
     }
@@ -150,7 +150,7 @@ contract Alpress {
 
         if (
             (blogs[label].owner != address(0)) &&
-            (blogs[label].expirationBlock < now)
+            (blogs[label].expirationBlock > now)
         ) taken = true;
     }
 
