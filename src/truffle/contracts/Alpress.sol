@@ -8,9 +8,12 @@ import './Resolver.sol';
 contract Alpress {
     bytes32 constant platform = keccak256(bytes('alpress')); //TODO hardcode maybe?
     bytes32 public constant TLD_NODE = 0x93cdeb708b7545dc668eb9280176169d1c33cfd8ed6f04690a0bcc88a93fc4ae; // namehash('eth')
-    address resolver; // ENS standard resolver
-    address almonit;
+    address public resolver; // ENS standard resolver
+    address private almonit;
     //address almonit = 0xC741cdDa197Af87Acd54a4A5f563C8efDbc754B7; // Almonit multisig account
+
+    uint256 private rentPricePerYear = 4000000000000000; // price in Wei of renting a blog for one year
+    ENS public ens;
 
     modifier almonit_only {
         require(msg.sender == almonit, 'Access denied');
@@ -27,13 +30,8 @@ contract Alpress {
 
     mapping(bytes32 => Blog) blogs;
 
-    uint256 rentPricePerYear = 4500000000000000; // price in Wei of renting a blog for one year
-    ENS public ens;
-    Resolver public publicResolver;
-
-    constructor(ENS _ens, Resolver _publicResolver, address _resolver) public {
+    constructor(ENS _ens, address _resolver) public {
         ens = _ens;
-        publicResolver = _publicResolver;
         resolver = _resolver;
         almonit = msg.sender;
     }
@@ -42,7 +40,8 @@ contract Alpress {
         bytes32 platformNode = keccak256(abi.encodePacked(TLD_NODE, platform));
         bytes32 label = keccak256(bytes(name));
 
-        // Blog must not be registered already.
+        // TODO: check blog name is unregistered
+        // Blog must not be registered already. 
         require(
             ens.owner(keccak256(abi.encodePacked(platformNode, label))) ==
                 address(0),
@@ -74,6 +73,9 @@ contract Alpress {
     function renew(string calldata name) external payable {
         bytes32 label = keccak256(bytes(name));
 
+        // TODO: check that blog is unregistered
+        
+
         // User must have paid enough
         require(
             msg.value >= rentPricePerYear,
@@ -86,6 +88,9 @@ contract Alpress {
         }
 
         if (blogs[label].expirationBlock < now) {
+            //create for one year "approximately" (assuming accurate block time, disregarding leap years)
+            blogs[label].expirationBlock = now + 365 days;
+        } else {
             //extend for one year "approximately" (assuming accurate block time, disregarding leap years)
             blogs[label].expirationBlock = blogs[label].expirationBlock + 365 days;
         }
@@ -106,9 +111,6 @@ contract Alpress {
             // Set the subdomain's resolver
             ens.setResolver(blogNode, address(0));
 
-            // Set the address record on the resolver
-            publicResolver.setAddr(blogNode, address(0));
-
             // Pass ownership of the new subdomain to the registrant
             ens.setOwner(blogNode, address(0));
         }
@@ -121,8 +123,7 @@ contract Alpress {
         bytes32 blogNode = keccak256(abi.encodePacked(platformNode, label));
         // Set the subdomain's resolver
         ens.setResolver(blogNode, resolver);
-        // Set the address record on the resolver
-        // publicResolver.setAddr(blogNode, address(0)); TODO fix it
+       
         // Pass ownership of the new subdomain to the registrant
         ens.setOwner(blogNode, subOwner);
     }
@@ -130,14 +131,12 @@ contract Alpress {
     /**
      * Functions for adjusting parameters
      **/
-    function setPrice(uint256 price) public almonit_only {
-        // Only Almonit can change price
-        rentPricePerYear = price;
+    function setPrice(uint256 _rentPricePerYear) public {
+        rentPricePerYear = _rentPricePerYear;
     }
 
-    function setDefaultResolver(address newResolver) public almonit_only {
-        // Only Almonit can change default resolver
-        resolver = newResolver;
+    function setDefaultResolver(address _resolver) public almonit_only {
+        resolver = _resolver;
     }
 
     /**
@@ -154,7 +153,7 @@ contract Alpress {
         ) taken = true;
     }
 
-    function checkOwner(string calldata name)
+    function getOwner(string calldata name)
         external
         view
         returns (address owner)
@@ -168,7 +167,7 @@ contract Alpress {
         }
     }
 
-    function checkExpiration(string calldata name)
+    function getExpiration(string calldata name)
         external
         view
         returns (uint256 expirationTime)
@@ -180,5 +179,13 @@ contract Alpress {
             bytes32 label = keccak256(bytes(name));
             expirationTime = blogs[label].expirationBlock;
         }
+    }
+
+    function getPrice()
+        external
+        view
+        returns (uint256 price)
+    {
+        price = rentPricePerYear;
     }
 }

@@ -5,7 +5,7 @@ import test from 'ava';
 import bs58 from 'bs58';
 import { ENSRegistry, FIFSRegistrar } from '@ensdomains/ens';
 import { PublicResolver } from '@ensdomains/resolver';
-import { AlpressRegistrar } from '../contracts';
+import { AlpressRegistrar } from '../truffle';
 import IPFS from 'ipfs';
 import namehash from 'eth-ens-namehash';
 import Web3 from 'web3';
@@ -75,11 +75,12 @@ test.before(async t => {
         data: AlpressRegistrar.bytecode,
         arguments: [
           contractRegistry.options.address,
-          contractTestRegistrar.options.address,
           contractTestRegistrar.options.address
         ]
       })
       .send(send_options);
+
+   console.log("public: ", contractTestRegistrar.options.address);
 
   await contractRegistry.methods
     .setSubnodeOwner(
@@ -253,7 +254,7 @@ test('register', async t => {
 
 test('Alpress Contract > non-allocated address', async t => {
   const contract = t.context['alpress'];
-  const ownerResult = await contract.methods.checkOwner('mdt').call();
+  const ownerResult = await contract.methods.getOwner('mdt').call();
   t.is(ownerResult, '0x0000000000000000000000000000000000000000');
 });
 
@@ -267,10 +268,10 @@ test('Alpress Contract > non-allocated expiration', async t => {
   const contract = t.context['alpress'];
 
   await contract.methods
-    .checkExpiration('mdt')
+    .getExpiration('mdt')
     .call();
 
-  const expirationResult = await contract.methods.checkExpiration('mdt').call();
+  const expirationResult = await contract.methods.getExpiration('mdt').call();
 
   t.is(expirationResult, '0');
 });
@@ -293,7 +294,7 @@ test('Alpress Contract > buy', async t => {
 test('Alpress Contract > allocated address', async t => {
   const contract = t.context['alpress'];
   const { account } = t.context['ens'];
-  const ownerResult = await contract.methods.checkOwner('mdt').call();
+  const ownerResult = await contract.methods.getOwner('mdt').call();
   t.is(ownerResult, account);
 });
 
@@ -305,8 +306,38 @@ test('Alpress Contract > allocated taken check', async t => {
 
 test('Alpress Contract > allocated expiration', async t => {
   const contract = t.context['alpress'];
-  const expirationResult = await contract.methods.checkExpiration('mdt').call();
+  const expirationResult = await contract.methods.getExpiration('mdt').call();
   t.not(expirationResult, '0');
+});
+
+test('Alpress Contract > set Price', async t => {
+  const contract = t.context['alpress'];
+  // const { address, registry, sendOptions } = t.context['ens'];
+  const { sendOptions } = t.context['ens'];
+
+  await contract.methods.setPrice(5000000000000000).send({
+    ...sendOptions,
+    value: 0
+  });
+
+  const priceResult = await contract.methods.getPrice().call();
+  
+  t.is(priceResult, '5000000000000000');
+});
+
+test('Alpress Contract > set default resolver', async t => {
+  const contract = t.context['alpress'];
+  // const { address, registry, sendOptions } = t.context['ens'];
+  const { sendOptions } = t.context['ens'];
+
+  await contract.methods.setDefaultResolver("0xc257274276a4e539741ca11b590b9447b26a8051").send({
+    ...sendOptions,
+    value: 0
+  });
+
+  const newAddress = await contract.methods.resolver().call();
+
+  t.is(newAddress, '0xC257274276a4E539741Ca11b590B9447B26A8051');
 });
 
 /**
