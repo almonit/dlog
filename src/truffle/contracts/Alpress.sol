@@ -40,11 +40,10 @@ contract Alpress {
         bytes32 platformNode = keccak256(abi.encodePacked(TLD_NODE, platform));
         bytes32 label = keccak256(bytes(name));
 
-        // TODO: check blog name is unregistered
-        // Blog must not be registered already. 
+        // Blog must not be already registered. 
         require(
-            ens.owner(keccak256(abi.encodePacked(platformNode, label))) ==
-                address(0),
+            ((ens.owner(keccak256(abi.encodePacked(platformNode, label))) ==
+                address(0)) || (blogs[label].owner == address(0))) ,
             'User already registered'
         );
 
@@ -60,21 +59,27 @@ contract Alpress {
         doRegistration(platformNode, label, msg.sender);
 
         // Create blog record
-        Blog storage blog = blogs[label];
-        blog.name = name;
-        blog.owner = msg.sender;
+        blogs[label].name = name;
+        blogs[label].owner = msg.sender;
 
         //register for one year "approximately" (assuming accurate block time disregarding leap years)
-        blog.expirationBlock = now + 365 days;
+        blogs[label].expirationBlock = now + 365 days;
 
         emit NewRegistration(label, name);
     }
 
     function renew(string calldata name) external payable {
         bytes32 label = keccak256(bytes(name));
+        bytes32 platformNode = keccak256(
+            abi.encodePacked(TLD_NODE, platform)
+        );
 
-        // TODO: check that blog is unregistered
-        
+        // Blog must be already registered. 
+        require(
+            ((ens.owner(keccak256(abi.encodePacked(platformNode, label))) !=
+                address(0)) && (blogs[label].owner != address(0))) ,
+            'Blog is not registered, cannot renew an unregistered blog'
+        );
 
         // User must have paid enough
         require(
@@ -99,21 +104,28 @@ contract Alpress {
     function unlist(string memory name) public almonit_only {
         bytes32 label = keccak256(bytes(name));
 
-        Blog storage blog = blogs[label];
-        if (blog.expirationBlock < now) {
-            bytes32 platformNode = keccak256(
-                abi.encodePacked(TLD_NODE, platform)
-            );
-            // Get the subdomain so we can configure it
-            ens.setSubnodeOwner(platformNode, label, address(this));
+        require(
+            blogs[label].expirationBlock < now,
+            'Blog is not expired yet'
+        );
 
-            bytes32 blogNode = keccak256(abi.encodePacked(platform, label));
-            // Set the subdomain's resolver
-            ens.setResolver(blogNode, address(0));
+        bytes32 platformNode = keccak256(
+            abi.encodePacked(TLD_NODE, platform)
+        );
+        
+        // Get the subdomain so we can configure it
+        ens.setSubnodeOwner(platformNode, label, address(this));
 
-            // Pass ownership of the new subdomain to the registrant
-            ens.setOwner(blogNode, address(0));
-        }
+        bytes32 blogNode = keccak256(abi.encodePacked(platform, label));
+        
+        // Delete subdomain resolver
+        ens.setResolver(blogNode, address(0));
+
+        // Delete subdomain owner, practically it deletes the ENS subdomain
+        ens.setOwner(blogNode, address(0));
+
+        // Delete blog from this contract mapping
+        delete blogs[label];
     }
 
     function doRegistration(bytes32 platformNode, bytes32 label, address subOwner) internal {

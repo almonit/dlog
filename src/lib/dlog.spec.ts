@@ -310,7 +310,7 @@ test('Alpress Contract > allocated expiration', async t => {
   t.not(expirationResult, '0');
 });
 
-test('Alpress Contract > set Price', async t => {
+test('Alpress Contract > set price', async t => {
   const contract = t.context['alpress'];
   // const { address, registry, sendOptions } = t.context['ens'];
   const { sendOptions } = t.context['ens'];
@@ -327,7 +327,6 @@ test('Alpress Contract > set Price', async t => {
 
 test('Alpress Contract > set default resolver', async t => {
   const contract = t.context['alpress'];
-  // const { address, registry, sendOptions } = t.context['ens'];
   const { sendOptions } = t.context['ens'];
 
   await contract.methods.setDefaultResolver("0xc257274276a4e539741ca11b590b9447b26a8051").send({
@@ -338,6 +337,26 @@ test('Alpress Contract > set default resolver', async t => {
   const newAddress = await contract.methods.resolver().call();
 
   t.is(newAddress, '0xC257274276a4E539741Ca11b590B9447B26A8051');
+});
+
+test('Alpress Contract > renew domain', async t => {
+  const contract = t.context['alpress'];
+  const { address, registry, sendOptions, web3 } = t.context['ens'];
+
+  await registry
+      .setOwner(address, contract.options.address)
+      .send(sendOptions);
+
+  await contract.methods.renew('mdt').send({
+    ...sendOptions,
+    value: web3.utils.toWei('0.005', 'ether')
+  });
+
+  await contract.methods.buy('mdt').send({
+    ...sendOptions,
+    value: web3.utils.toWei('0.005', 'ether')
+  });
+  t.pass();
 });
 
 /**
