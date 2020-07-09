@@ -17,9 +17,12 @@ const ganache = require('ganache-core');
 test.before(async t => {
   const repoPath = 'repo/ipfs-' + Math.random();
   const ipfs = await IPFS.create({ repo: repoPath });
-  // await ipfs.bootstrap.add(
-  //   "/ipv4/ip/port/ipfs/cid"
-  // );
+  await ipfs.bootstrap.add(
+    "/ip4/95.179.128.10/tcp/8080/p2p/QmYDZk4ns1qSReQoZHcGa8jjy8SdhdAqy3eBgd1YMgGN9j"
+  );
+  await ipfs.bootstrap.add(
+    "/ip4/95.179.128.10/tcp/5001/p2p/QmYDZk4ns1qSReQoZHcGa8jjy8SdhdAqy3eBgd1YMgGN9j"
+  );
   // const provider = new Web3.providers.HttpProvider('http://localhost:7545');
   const provider = ganache.provider({
     allowUnlimitedContractSize: true,
@@ -360,6 +363,20 @@ test('Alpress Contract > allocated domain buy', async t => {
     value: web3.utils.toWei('0.005', 'ether')
   });
   await t.throwsAsync(promise);
+});
+
+
+// TODO: how to do this test? expiration happens only after a long time
+test('Alpress Contract > unlist domain', async t => {
+  const contract = t.context['alpress'];
+  const { sendOptions } = t.context['ens'];
+
+  const promise = contract.methods.unlist('mdt').send({
+    ...sendOptions,
+    value: 0
+  });
+
+  await t.throwsAsync(promise, 'VM Exception while processing transaction: revert Blog is not expired yet');
 });
 
 /**
