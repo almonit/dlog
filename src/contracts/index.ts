@@ -1,4 +1,4 @@
-import AlpressRegistrar from './bin/Alpress.json';
+import AlpressRegistrar from './build/contracts/Alpress.json';
 
 export {
   AlpressRegistrar

@@ -5,7 +5,7 @@ import test from 'ava';
 import bs58 from 'bs58';
 import { ENSRegistry, FIFSRegistrar } from '@ensdomains/ens';
 import { PublicResolver } from '@ensdomains/resolver';
-import { AlpressRegistrar } from '../truffle';
+import { AlpressRegistrar } from '../contracts';
 import IPFS from 'ipfs';
 import namehash from 'eth-ens-namehash';
 import Web3 from 'web3';
@@ -17,6 +17,9 @@ const ganache = require('ganache-core');
 test.before(async t => {
   const repoPath = 'repo/ipfs-' + Math.random();
   const ipfs = await IPFS.create({ repo: repoPath });
+  // await ipfs.bootstrap.add(
+  //   "/ipv4/ip/port/ipfs/cid"
+  // );
   // const provider = new Web3.providers.HttpProvider('http://localhost:7545');
   const provider = ganache.provider({
     allowUnlimitedContractSize: true,
@@ -67,20 +70,20 @@ test.before(async t => {
     })
     .send(send_options);
 
-    const instanceAlpressRegistrar = new web3.eth.Contract(
-      AlpressRegistrar.abi as any
-    );
-    const contractAlpressRegistrar = await instanceAlpressRegistrar
-      .deploy({
-        data: AlpressRegistrar.bytecode,
-        arguments: [
-          contractRegistry.options.address,
-          contractTestRegistrar.options.address
-        ]
-      })
-      .send(send_options);
+  const instanceAlpressRegistrar = new web3.eth.Contract(
+    AlpressRegistrar.abi as any
+  );
+  const contractAlpressRegistrar = await instanceAlpressRegistrar
+    .deploy({
+      data: AlpressRegistrar.bytecode,
+      arguments: [
+        contractRegistry.options.address,
+        contractTestRegistrar.options.address
+      ]
+    })
+    .send(send_options);
 
-   console.log("public: ", contractTestRegistrar.options.address);
+  console.log('public: ', contractTestRegistrar.options.address);
 
   await contractRegistry.methods
     .setSubnodeOwner(
@@ -267,9 +270,7 @@ test('Alpress Contract > non-allocated taken check', async t => {
 test('Alpress Contract > non-allocated expiration', async t => {
   const contract = t.context['alpress'];
 
-  await contract.methods
-    .getExpiration('mdt')
-    .call();
+  await contract.methods.getExpiration('mdt').call();
 
   const expirationResult = await contract.methods.getExpiration('mdt').call();
 
@@ -280,9 +281,7 @@ test('Alpress Contract > buy', async t => {
   const contract = t.context['alpress'];
   const { address, registry, sendOptions, web3 } = t.context['ens'];
 
-  await registry
-      .setOwner(address, contract.options.address)
-      .send(sendOptions);
+  await registry.setOwner(address, contract.options.address).send(sendOptions);
 
   await contract.methods.buy('mdt').send({
     ...sendOptions,
@@ -321,7 +320,7 @@ test('Alpress Contract > set price', async t => {
   });
 
   const priceResult = await contract.methods.getPrice().call();
-  
+
   t.is(priceResult, '5000000000000000');
 });
 
@@ -329,10 +328,12 @@ test('Alpress Contract > set default resolver', async t => {
   const contract = t.context['alpress'];
   const { sendOptions } = t.context['ens'];
 
-  await contract.methods.setDefaultResolver("0xc257274276a4e539741ca11b590b9447b26a8051").send({
-    ...sendOptions,
-    value: 0
-  });
+  await contract.methods
+    .setDefaultResolver('0xc257274276a4e539741ca11b590b9447b26a8051')
+    .send({
+      ...sendOptions,
+      value: 0
+    });
 
   const newAddress = await contract.methods.resolver().call();
 
@@ -341,22 +342,24 @@ test('Alpress Contract > set default resolver', async t => {
 
 test('Alpress Contract > renew domain', async t => {
   const contract = t.context['alpress'];
-  const { address, registry, sendOptions, web3 } = t.context['ens'];
-
-  await registry
-      .setOwner(address, contract.options.address)
-      .send(sendOptions);
+  const { sendOptions, web3 } = t.context['ens'];
 
   await contract.methods.renew('mdt').send({
     ...sendOptions,
     value: web3.utils.toWei('0.005', 'ether')
   });
+  t.pass()
+});
 
-  await contract.methods.buy('mdt').send({
+test('Alpress Contract > allocated domain buy', async t => {
+  const contract = t.context['alpress'];
+  const { sendOptions, web3 } = t.context['ens'];
+
+  const promise = contract.methods.buy('mdt').send({
     ...sendOptions,
     value: web3.utils.toWei('0.005', 'ether')
   });
-  t.pass();
+  await t.throwsAsync(promise);
 });
 
 /**
