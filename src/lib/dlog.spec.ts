@@ -375,7 +375,7 @@ test('Alpress Contract > unlist expired domain', async t => {
   const expiration = await contract.methods.getExpiration('mdt').call();
   const diff = expiration - parseInt((Date.now() / 1000).toString());
   // Time travel one day ahead of expiration
-  await timeTravel(web3, [diff + 60 * 60 * 24]);
+  await timeTravel(web3, (diff + 60 * 60 * 24));
   await contract.methods.unlist('mdt').send(sendOptions);
   t.pass();
 });
@@ -429,14 +429,14 @@ function getIpfsHashFromBytes32(bytes32Hex: string): string {
 
 function timeTravel(
   web3: { currentProvider: AbstractProvider },
-  time: number[]
+  time: number
 ): Promise<void> {
   return new Promise(resolve => {
     web3.currentProvider.sendAsync(
       {
         jsonrpc: '2.0',
         method: 'evm_increaseTime',
-        params: time || [],
+        params: [time],
         id: new Date().getTime()
       },
       error => {
