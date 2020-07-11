@@ -9,16 +9,17 @@ import { AlpressRegistrar } from '../contracts';
 import IPFS from 'ipfs';
 import namehash from 'eth-ens-namehash';
 import Web3 from 'web3';
+import { AbstractProvider } from 'web3-core/types';
 import { DLog } from './dlog';
 import { Article, ArticleSummary, Author, Bucket, Identity } from './models';
 
 const ganache = require('ganache-core');
 
-test.before(async t => {
+test.before(async t => {  
   const repoPath = 'repo/ipfs-' + Math.random();
   const ipfs = await IPFS.create({ repo: repoPath });
   await ipfs.bootstrap.add(
-    "/ip4/95.179.128.10/tcp/5001/p2p/QmYDZk4ns1qSReQoZHcGa8jjy8SdhdAqy3eBgd1YMgGN9j"
+    '/ip4/95.179.128.10/tcp/5001/p2p/QmYDZk4ns1qSReQoZHcGa8jjy8SdhdAqy3eBgd1YMgGN9j'
   );
   // const provider = new Web3.providers.HttpProvider('http://localhost:7545');
   const provider = ganache.provider({
@@ -314,10 +315,7 @@ test('Alpress Contract > set price', async t => {
   // const { address, registry, sendOptions } = t.context['ens'];
   const { sendOptions } = t.context['ens'];
 
-  await contract.methods.setPrice(5000000000000000).send({
-    ...sendOptions,
-    value: 0
-  });
+  await contract.methods.setPrice(5000000000000000).send(sendOptions);
 
   const priceResult = await contract.methods.getPrice().call();
 
@@ -330,10 +328,7 @@ test('Alpress Contract > set default resolver', async t => {
 
   await contract.methods
     .setDefaultResolver('0xc257274276a4e539741ca11b590b9447b26a8051')
-    .send({
-      ...sendOptions,
-      value: 0
-    });
+    .send(sendOptions);
 
   const newAddress = await contract.methods.resolver().call();
 
@@ -348,7 +343,7 @@ test('Alpress Contract > renew domain', async t => {
     ...sendOptions,
     value: web3.utils.toWei('0.005', 'ether')
   });
-  t.pass()
+  t.pass();
 });
 
 test('Alpress Contract > allocated domain buy', async t => {
@@ -362,39 +357,67 @@ test('Alpress Contract > allocated domain buy', async t => {
   await t.throwsAsync(promise);
 });
 
-
-// TODO: how to do this test? expiration happens only after a long time
-test('Alpress Contract > unlist domain', async t => {
+test('Alpress Contract > unlist non-expired domain', async t => {
   const contract = t.context['alpress'];
   const { sendOptions } = t.context['ens'];
 
-  const promise = contract.methods.unlist('mdt').send({
-    ...sendOptions,
-    value: 0
-  });
+  const promise = contract.methods.unlist('mdt').send(sendOptions);
 
-  await t.throwsAsync(promise, 'VM Exception while processing transaction: revert Blog is not expired yet');
+  await t.throwsAsync(
+    promise,
+    'VM Exception while processing transaction: revert Blog is not expired yet'
+  );
+});
+
+test('Alpress Contract > unlist expired domain', async t => {
+  const contract = t.context['alpress'];
+  const { sendOptions, web3 } = t.context['ens'];
+  const expiration = await contract.methods.getExpiration('mdt').call();
+  const diff = expiration - parseInt((Date.now() / 1000).toString());
+  // Time travel one day ahead of expiration
+  await timeTravel(web3, [diff + 60 * 60 * 24]);
+  await contract.methods.unlist('mdt').send(sendOptions);
+  t.pass();
+});
+
+test('Alpress Contract > unlisted expiration', async t => {
+  const contract = t.context['alpress'];
+
+  await contract.methods.getExpiration('mdt').call();
+
+  const expirationResult = await contract.methods.getExpiration('mdt').call();
+
+  t.is(expirationResult, '0');
+});
+
+test('Alpress Contract > unlisted address', async t => {
+  const contract = t.context['alpress'];
+  const ownerResult = await contract.methods.getOwner('mdt').call();
+  t.is(ownerResult, '0x0000000000000000000000000000000000000000');
 });
 
 /**
  * Auxiliary functions
  */
 
-function getRootNodeFromTLD(web3, tld) {
+function getRootNodeFromTLD(
+  web3: Web3,
+  tld: string
+): { namehash: string; sha3: string | null } {
   return {
     namehash: namehash.hash(tld),
     sha3: web3.utils.sha3(tld)
   };
 }
 
-function getBytes32FromIpfsHash(hash: string) {
+function getBytes32FromIpfsHash(hash: string): string {
   return `0x${bs58
     .decode(hash)
     .slice(2)
     .toString('hex')}`;
 }
 
-function getIpfsHashFromBytes32(bytes32Hex) {
+function getIpfsHashFromBytes32(bytes32Hex: string): string {
   // Add our default ipfs values for first 2 bytes:
   // function:0x12=sha2, size:0x20=256 bits
   // and cut off leading "0x"
@@ -402,4 +425,24 @@ function getIpfsHashFromBytes32(bytes32Hex) {
   const hashBytes = Buffer.from(hashHex, 'hex');
   const hashStr = bs58.encode(hashBytes);
   return hashStr;
+}
+
+function timeTravel(
+  web3: { currentProvider: AbstractProvider },
+  time: number[]
+): Promise<void> {
+  return new Promise(resolve => {
+    web3.currentProvider.sendAsync(
+      {
+        jsonrpc: '2.0',
+        method: 'evm_increaseTime',
+        params: time || [],
+        id: new Date().getTime()
+      },
+      error => {
+        if (error) throw error;
+        resolve();
+      }
+    );
+  });
 }

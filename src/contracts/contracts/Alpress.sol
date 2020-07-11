@@ -116,7 +116,7 @@ contract Alpress {
         // Get the subdomain so we can configure it
         ens.setSubnodeOwner(platformNode, label, address(this));
 
-        bytes32 blogNode = keccak256(abi.encodePacked(platform, label));
+        bytes32 blogNode = keccak256(abi.encodePacked(platformNode, label));
 
         // Delete subdomain resolver
         ens.setResolver(blogNode, address(0));
@@ -135,7 +135,6 @@ contract Alpress {
         bytes32 blogNode = keccak256(abi.encodePacked(platformNode, label));
         // Set the subdomain's resolver
         ens.setResolver(blogNode, resolver);
-       
         // Pass ownership of the new subdomain to the registrant
         ens.setOwner(blogNode, subOwner);
     }
@@ -143,7 +142,7 @@ contract Alpress {
     /**
      * Functions for adjusting parameters
      **/
-    function setPrice(uint256 _rentPricePerYear) public {
+    function setPrice(uint256 _rentPricePerYear) public almonit_only {
         rentPricePerYear = _rentPricePerYear;
     }
 
