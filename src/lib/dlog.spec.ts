@@ -130,8 +130,6 @@ test('put/get author', async t => {
   const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
   const cid_author = await dlog.putAuthor(author);
   const result_author = await dlog.getAuthor(cid_author.toString());
-  t.context['cid_author'] = cid_author;
-  t.context['author'] = author;
   t.is(result_author.name, author.name);
 });
 
@@ -141,7 +139,6 @@ test('put/get article', async t => {
   const article = new Article(author, 'Test', 'base64_img', []);
   const cid_article = await dlog.putArticle(article);
   const result_article = await dlog.getArticle(cid_article.toString());
-  t.context['article'] = cid_article;
   t.is(result_article.content, article.content);
 });
 
@@ -160,7 +157,6 @@ test('put/get article summary', async t => {
   );
   const cid_AS = await dlog.putArticleSummary(article_summary);
   const result_aso = await dlog.getArticleSummary(cid_AS.toString());
-  t.context['AS'] = cid_AS;
   t.is(result_aso.title, article_summary.title);
 });
 
