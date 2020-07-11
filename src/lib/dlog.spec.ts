@@ -18,9 +18,6 @@ test.before(async t => {
   const repoPath = 'repo/ipfs-' + Math.random();
   const ipfs = await IPFS.create({ repo: repoPath });
   await ipfs.bootstrap.add(
-    "/ip4/95.179.128.10/tcp/8080/p2p/QmYDZk4ns1qSReQoZHcGa8jjy8SdhdAqy3eBgd1YMgGN9j"
-  );
-  await ipfs.bootstrap.add(
     "/ip4/95.179.128.10/tcp/5001/p2p/QmYDZk4ns1qSReQoZHcGa8jjy8SdhdAqy3eBgd1YMgGN9j"
   );
   // const provider = new Web3.providers.HttpProvider('http://localhost:7545');
