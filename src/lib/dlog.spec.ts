@@ -1,21 +1,23 @@
 // tslint:disable:no-expression-statement
 // tslint:disable:no-string-literal
 // tslint:disable:no-object-mutation
-import test from 'ava';
-import bs58 from 'bs58';
 import { ENSRegistry, FIFSRegistrar } from '@ensdomains/ens';
 import { PublicResolver } from '@ensdomains/resolver';
-import { AlpressRegistrar } from '../contracts';
-import IPFS from 'ipfs';
+import test from 'ava';
+import bs58 from 'bs58';
+import contentHash from 'content-hash';
 import namehash from 'eth-ens-namehash';
+import IPFS from 'ipfs';
 import Web3 from 'web3';
 import { AbstractProvider } from 'web3-core/types';
+
+import { AlpressRegistrar } from '../contracts';
 import { DLog } from './dlog';
 import { Article, ArticleSummary, Author, Bucket, Identity } from './models';
 
 const ganache = require('ganache-core');
 
-test.before(async t => {  
+test.before(async t => {
   const repoPath = 'repo/ipfs-' + Math.random();
   const ipfs = await IPFS.create({ repo: repoPath });
   await ipfs.bootstrap.add(
@@ -342,6 +344,18 @@ test('Alpress Contract > renew domain', async t => {
   t.pass();
 });
 
+test('Alpress Contract > publish', async t => {
+  const contract = t.context['alpress'];
+  const { sendOptions } = t.context['ens'];
+  await contract.methods
+    .publish(
+      'mdt',
+      contentHash.fromIpfs('QmVNJbmxqpCj2kKB8ddtAweKU1dWeNisymCdNiYw6wokyz')
+    )
+    .send(sendOptions);
+  t.pass();
+});
+
 test('Alpress Contract > allocated domain buy', async t => {
   const contract = t.context['alpress'];
   const { sendOptions, web3 } = t.context['ens'];
@@ -371,7 +385,7 @@ test('Alpress Contract > unlist expired domain', async t => {
   const expiration = await contract.methods.getExpiration('mdt').call();
   const diff = expiration - parseInt((Date.now() / 1000).toString());
   // Time travel one day ahead of expiration
-  await timeTravel(web3, (diff + 60 * 60 * 24));
+  await timeTravel(web3, diff + 60 * 60 * 24);
   await contract.methods.unlist('mdt').send(sendOptions);
   t.pass();
 });

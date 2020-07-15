@@ -7,7 +7,9 @@ import './Resolver.sol';
 // SPDX-License-Identifier: GPL
 contract Alpress {
     bytes32 constant platform = keccak256(bytes('alpress')); //TODO hardcode maybe?
-    bytes32 public constant TLD_NODE = 0x93cdeb708b7545dc668eb9280176169d1c33cfd8ed6f04690a0bcc88a93fc4ae; // namehash('eth')
+    bytes32
+        public constant TLD_NODE = 0x93cdeb708b7545dc668eb9280176169d1c33cfd8ed6f04690a0bcc88a93fc4ae; // namehash('eth')
+    bytes32 platformNode = keccak256(abi.encodePacked(TLD_NODE, platform));
     address public resolver; // ENS standard resolver
     address private almonit;
     //address almonit = 0xC741cdDa197Af87Acd54a4A5f563C8efDbc754B7; // Almonit multisig account
@@ -21,6 +23,8 @@ contract Alpress {
     }
 
     event NewRegistration(bytes32 indexed label, string name);
+
+    event Publication(bytes32 indexed label, string contentHash);
 
     struct Blog {
         string name;
@@ -37,13 +41,12 @@ contract Alpress {
     }
 
     function buy(string calldata name) external payable {
-        bytes32 platformNode = keccak256(abi.encodePacked(TLD_NODE, platform));
         bytes32 label = keccak256(bytes(name));
 
         // Blog must not be already registered.
         require(
             ((ens.owner(keccak256(abi.encodePacked(platformNode, label))) ==
-                address(0)) || (blogs[label].owner == address(0))) ,
+                address(0)) || (blogs[label].owner == address(0))),
             'User already registered'
         );
 
@@ -56,7 +59,7 @@ contract Alpress {
         }
 
         // Register the domain in ENS
-        doRegistration(platformNode, label, msg.sender);
+        doRegistration(label);
 
         // Create blog record
         blogs[label].name = name;
@@ -70,14 +73,11 @@ contract Alpress {
 
     function renew(string calldata name) external payable {
         bytes32 label = keccak256(bytes(name));
-        bytes32 platformNode = keccak256(
-            abi.encodePacked(TLD_NODE, platform)
-        );
 
         // Blog must be already registered.
         require(
             ((ens.owner(keccak256(abi.encodePacked(platformNode, label))) !=
-                address(0)) && (blogs[label].owner != address(0))) ,
+                address(0)) && (blogs[label].owner != address(0))),
             'Blog is not registered, cannot renew an unregistered blog'
         );
 
@@ -97,21 +97,16 @@ contract Alpress {
             blogs[label].expirationBlock = now + 365 days;
         } else {
             //extend for one year "approximately" (assuming accurate block time, disregarding leap years)
-            blogs[label].expirationBlock = blogs[label].expirationBlock + 365 days;
+            blogs[label].expirationBlock =
+                blogs[label].expirationBlock +
+                365 days;
         }
     }
 
     function unlist(string memory name) public almonit_only {
         bytes32 label = keccak256(bytes(name));
 
-        require(
-            blogs[label].expirationBlock < now,
-            'Blog is not expired yet'
-        );
-
-        bytes32 platformNode = keccak256(
-            abi.encodePacked(TLD_NODE, platform)
-        );
+        require(blogs[label].expirationBlock < now, 'Blog is not expired yet');
 
         // Get the subdomain so we can configure it
         ens.setSubnodeOwner(platformNode, label, address(this));
@@ -128,7 +123,7 @@ contract Alpress {
         delete blogs[label];
     }
 
-    function doRegistration(bytes32 platformNode, bytes32 label, address subOwner) internal {
+    function doRegistration(bytes32 label) internal {
         // Get the subdomain so we can configure it
         ens.setSubnodeOwner(platformNode, label, address(this));
 
@@ -136,7 +131,35 @@ contract Alpress {
         // Set the subdomain's resolver
         ens.setResolver(blogNode, resolver);
         // Pass ownership of the new subdomain to the registrant
-        ens.setOwner(blogNode, subOwner);
+        ens.setOwner(blogNode, msg.sender);
+    }
+
+    function publish(string calldata name, string calldata contentHash)
+        external
+    {
+        bytes32 label = keccak256(bytes(name));
+
+        require(
+            blogs[label].owner == msg.sender,
+            'Only owner of the blog can publish'
+        );
+
+        require(
+            blogs[label].expirationBlock > now,
+            'To be able to publish, you need to renew domain'
+        );
+
+        bytes32 blogNode = keccak256(abi.encodePacked(platformNode, label));
+        address _resolver = ens.resolver(blogNode);
+        (bool success,) = _resolver.delegatecall(
+            abi.encodeWithSelector(
+                bytes4(keccak256('setContenthash(bytes32, bytes calldata)')),
+                blogNode,
+                bytes(contentHash)
+            )
+        );
+        require(success, 'nope');
+        emit Publication(label, contentHash);
     }
 
     /**
@@ -192,11 +215,7 @@ contract Alpress {
         }
     }
 
-    function getPrice()
-        external
-        view
-        returns (uint256 price)
-    {
+    function getPrice() external view returns (uint256 price) {
         price = rentPricePerYear;
     }
 }
