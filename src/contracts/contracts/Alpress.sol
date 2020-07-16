@@ -137,7 +137,6 @@ contract Alpress {
     function publish(string calldata name, string calldata contentHash)
         external
     {
-
         bytes32 label = keccak256(bytes(name));
 
         require(
@@ -151,8 +150,14 @@ contract Alpress {
         );
 
         bytes32 blogNode = keccak256(abi.encodePacked(platformNode, label));
-        bytes memory setContenthashEncoded = abi.encodePacked(bytes4(keccak256('setContenthash(bytes32, bytes calldata)')), blogNode, bytes(contentHash));
-        (bool success,) = address(resolver).delegatecall(setContenthashEncoded);
+        bytes memory setContenthashEncoded = abi.encodePacked(
+            bytes4(keccak256('setContenthash(bytes32, bytes calldata)')),
+            blogNode,
+            bytes(contentHash)
+        );
+        (bool success, ) = address(resolver).delegatecall(
+            setContenthashEncoded
+        );
         require(success, 'nope');
         emit Publication(label, contentHash);
     }
