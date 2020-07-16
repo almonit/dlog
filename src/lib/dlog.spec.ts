@@ -81,7 +81,7 @@ test.before(async t => {
       data: AlpressRegistrar.bytecode,
       arguments: [
         contractRegistry.options.address,
-        contractTestRegistrar.options.address
+        contractResolver.options.address
       ]
     })
     .send(send_options);

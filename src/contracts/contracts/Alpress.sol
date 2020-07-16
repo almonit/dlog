@@ -10,7 +10,7 @@ contract Alpress {
     bytes32
         public constant TLD_NODE = 0x93cdeb708b7545dc668eb9280176169d1c33cfd8ed6f04690a0bcc88a93fc4ae; // namehash('eth')
     bytes32 platformNode = keccak256(abi.encodePacked(TLD_NODE, platform));
-    address public resolver; // ENS standard resolver
+    Resolver public resolver; // ENS standard resolver
     address private almonit;
     //address almonit = 0xC741cdDa197Af87Acd54a4A5f563C8efDbc754B7; // Almonit multisig account
 
@@ -34,7 +34,7 @@ contract Alpress {
 
     mapping(bytes32 => Blog) blogs;
 
-    constructor(ENS _ens, address _resolver) public {
+    constructor(ENS _ens, Resolver _resolver) public {
         ens = _ens;
         resolver = _resolver;
         almonit = msg.sender;
@@ -129,7 +129,7 @@ contract Alpress {
 
         bytes32 blogNode = keccak256(abi.encodePacked(platformNode, label));
         // Set the subdomain's resolver
-        ens.setResolver(blogNode, resolver);
+        ens.setResolver(blogNode, address(resolver));
         // Pass ownership of the new subdomain to the registrant
         ens.setOwner(blogNode, msg.sender);
     }
@@ -137,6 +137,7 @@ contract Alpress {
     function publish(string calldata name, string calldata contentHash)
         external
     {
+
         bytes32 label = keccak256(bytes(name));
 
         require(
@@ -150,14 +151,8 @@ contract Alpress {
         );
 
         bytes32 blogNode = keccak256(abi.encodePacked(platformNode, label));
-        address _resolver = ens.resolver(blogNode);
-        (bool success,) = _resolver.delegatecall(
-            abi.encodeWithSelector(
-                bytes4(keccak256('setContenthash(bytes32, bytes calldata)')),
-                blogNode,
-                bytes(contentHash)
-            )
-        );
+        bytes memory setContenthashEncoded = abi.encodePacked(bytes4(keccak256('setContenthash(bytes32, bytes calldata)')), blogNode, bytes(contentHash));
+        (bool success,) = address(resolver).delegatecall(setContenthashEncoded);
         require(success, 'nope');
         emit Publication(label, contentHash);
     }
@@ -169,7 +164,7 @@ contract Alpress {
         rentPricePerYear = _rentPricePerYear;
     }
 
-    function setDefaultResolver(address _resolver) public almonit_only {
+    function setDefaultResolver(Resolver _resolver) public almonit_only {
         resolver = _resolver;
     }
 
