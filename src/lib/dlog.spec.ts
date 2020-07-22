@@ -11,7 +11,7 @@ import IPFS from 'ipfs';
 import Web3 from 'web3';
 import { AbstractProvider } from 'web3-core/types';
 
-import { AlpressRegistrar } from '../contracts';
+import { AlpressResolver, AlpressRegistrar } from '../contracts';
 import { DLog } from './dlog';
 import { Article, ArticleSummary, Author, Bucket, Identity } from './models';
 

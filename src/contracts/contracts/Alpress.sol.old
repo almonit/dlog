@@ -1,8 +1,9 @@
-pragma solidity >=0.6.10;
+// pragma solidity >=0.6.10;
+pragma solidity >=0.5.0;
 
 import './ENS.sol';
 import './FIFSRegistrar.sol';
-import './Resolver.sol';
+import './resolver/AlpressResolver.sol';
 
 // SPDX-License-Identifier: GPL
 contract Alpress {
@@ -10,7 +11,7 @@ contract Alpress {
     bytes32
         public constant TLD_NODE = 0x93cdeb708b7545dc668eb9280176169d1c33cfd8ed6f04690a0bcc88a93fc4ae; // namehash('eth')
     bytes32 platformNode = keccak256(abi.encodePacked(TLD_NODE, platform));
-    Resolver public resolver; // ENS standard resolver
+    AlpressResolver public resolver; // ENS standard resolver
     address private almonit;
     //address almonit = 0xC741cdDa197Af87Acd54a4A5f563C8efDbc754B7; // Almonit multisig account
 
@@ -34,7 +35,7 @@ contract Alpress {
 
     mapping(bytes32 => Blog) blogs;
 
-    constructor(ENS _ens, Resolver _resolver) public {
+    constructor(ENS _ens, AlpressResolver _resolver) public {
         ens = _ens;
         resolver = _resolver;
         almonit = msg.sender;
@@ -164,7 +165,7 @@ contract Alpress {
         rentPricePerYear = _rentPricePerYear;
     }
 
-    function setDefaultResolver(Resolver _resolver) public almonit_only {
+    function setDefaultResolver(AlpressResolver _resolver) public almonit_only {
         resolver = _resolver;
     }
 
