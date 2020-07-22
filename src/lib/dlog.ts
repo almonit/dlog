@@ -355,7 +355,7 @@ export class DLog {
       await this.node.files.cp(from, to, options);
     } catch (error) {
       console.warn('IPFS.Files.CP', error.code, from);
-      if(error.code == 'ERR_ALREADY_EXISTS') return;
+      if (error.code == 'ERR_ALREADY_EXISTS') return;
 
       for await (const file of this.node.get(from)) {
         if (!file.content) continue;
@@ -381,14 +381,12 @@ export class DLog {
     return result;
   }
 
-  private async fromBuffer(
-    chunks: AsyncIterable<BufferList>
-  ): Promise<string> {
+  private async fromBuffer(chunks: AsyncIterable<BufferList>): Promise<string> {
     const content = new BufferList();
     for await (const chunk of chunks) {
       content.append(chunk);
     }
-    return content.toString("utf8");
+    return content.toString('utf8');
   }
 
   private pathJoin(parts: String[], separator: string = '/') {
