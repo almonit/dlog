@@ -1,28 +1,29 @@
 // import all from 'it-all';
 import CID from 'cids';
 import BufferList from 'bl';
+import contentHash from 'content-hash';
 import IPFS from 'ipfs';
 import { IPFSPath } from 'ipfs/types/interface-ipfs-core/common';
 import Web3 from 'web3';
+import { AlpressRegistrar } from '../contracts';
 
-import {
-  Article,
-  ArticleSummary,
-  Author,
-  Bucket,
-  ENSContent,
-  Identity
-} from './models';
+import { Article, ArticleSummary, Author, Bucket, Identity } from './models';
 
 export class DLog {
   public static readonly AUTHOR_PAGE: string =
     '/ipfs/QmamDJKm5DtpxtHdF8raZm4Nz7QV19WQSyP64sdUQKDFfi';
   public static readonly IDENTITY_FILE: string = 'identity.json';
   public static readonly INDEX_FILE: string = 'index.html';
+  public alpress;
 
-  constructor(public node: IPFS, public web3: Web3 | any = null) {
+  constructor(
+    public node: IPFS,
+    public web3: Web3 | any = null,
+    alpress_address: string = ''
+  ) {
     this.node = node;
     this.web3 = web3;
+    this.alpress = new web3.eth.Contract(AlpressRegistrar.abi, alpress_address);
   }
 
   /* Public methods */
@@ -296,14 +297,24 @@ export class DLog {
    * @param options [setContentHash options]
    */
   public async register(
-    ens_address,
+    subdomain: string,
     identity: Identity,
     options?: object
   ): Promise<string> {
     const user_cid = await this.createIdentity(identity);
-    const ens = new ENSContent(ens_address, user_cid.toString(), options);
-    const result = await this.setContentHash(ens);
+    await this.alpress.methods.buy(subdomain).send({
+      ...options,
+      value: this.web3.utils.toWei('0.005', 'ether')
+    });
+    const result = await this.alpress.methods
+      .publish(subdomain, contentHash.fromIpfs(user_cid.toString()))
+      .send(options);
     return result;
+  }
+
+  public async checkTaken(domain: string): Promise<boolean> {
+    const takenResult = await this.alpress.methods.checkTaken(domain).call();
+    return takenResult;
   }
 
   /**
@@ -372,14 +383,14 @@ export class DLog {
     return content_hash;
   }
 
-  private async setContentHash(ens: ENSContent): Promise<string> {
-    const result = await this.web3.eth.ens.setContentHash(
-      ens.address,
-      ens.content_hash,
-      ens.options
-    );
-    return result;
-  }
+  // private async setContentHash(ens: ENSContent): Promise<string> {
+  //   const result = await this.web3.eth.ens.setContentHash(
+  //     ens.address,
+  //     ens.content_hash,
+  //     ens.options
+  //   );
+  //   return result;
+  // }
 
   private async fromBuffer(chunks: AsyncIterable<BufferList>): Promise<string> {
     const content = new BufferList();
@@ -393,4 +404,12 @@ export class DLog {
     const replace = new RegExp(separator + '{1,}', 'g');
     return parts.join(separator).replace(replace, separator);
   }
+  // private getBytes32FromIpfsHash(hash: string): string {
+  //   return `0x${bs58
+  //     .decode(hash)
+  //     .slice(2)
+  //     .toString('hex')}`;
+  // }
 }
+
+export * from './utils';
