@@ -4,7 +4,7 @@
 import { ENSRegistry, FIFSRegistrar } from '@ensdomains/ens';
 // import { PublicResolver } from '@ensdomains/resolver';
 import test from 'ava';
-import bs58 from 'bs58';
+// import bs58 from 'bs58';
 import contentHash from 'content-hash';
 import namehash from 'eth-ens-namehash';
 import IPFS from 'ipfs';
@@ -55,25 +55,6 @@ test.before(async t => {
     })
     .send(send_options);
 
-  const instanceResolver = new web3.eth.Contract(AlpressResolver.abi as any);
-  const contractResolver = await instanceResolver
-    .deploy({
-      data: AlpressResolver.bytecode,
-      arguments: [contractRegistry.options.address]
-    })
-    .send(send_options);
-
-  const resolverMethods = contractResolver.methods;
-  console.log('resolverMethods', resolverMethods)
-
-  const instanceTestRegistrar = new web3.eth.Contract(FIFSRegistrar.abi);
-  const contractTestRegistrar = await instanceTestRegistrar
-    .deploy({
-      data: FIFSRegistrar.bytecode,
-      arguments: [contractRegistry.options.address, rootNode.namehash]
-    })
-    .send(send_options);
-
   const instanceAlpressRegistrar = new web3.eth.Contract(
     AlpressRegistrar.abi as any
   );
@@ -82,12 +63,31 @@ test.before(async t => {
       data: AlpressRegistrar.bytecode,
       arguments: [
         contractRegistry.options.address,
-        contractResolver.options.address
+        '0x0000000000000000000000000000000000000000'
       ]
     })
     .send(send_options);
 
-  console.log('public: ', contractTestRegistrar.options.address);
+  const instanceResolver = new web3.eth.Contract(AlpressResolver.abi as any);
+  const contractResolver = await instanceResolver
+    .deploy({
+      data: AlpressResolver.bytecode,
+      arguments: [
+        contractRegistry.options.address,
+        contractAlpressRegistrar.options.address
+      ]
+    })
+    .send(send_options);
+
+  const resolverMethods = contractResolver.methods;
+
+  const instanceTestRegistrar = new web3.eth.Contract(FIFSRegistrar.abi);
+  const contractTestRegistrar = await instanceTestRegistrar
+    .deploy({
+      data: FIFSRegistrar.bytecode,
+      arguments: [contractRegistry.options.address, rootNode.namehash]
+    })
+    .send(send_options);
 
   await contractRegistry.methods
     .setSubnodeOwner(
@@ -107,7 +107,15 @@ test.before(async t => {
     await contractRegistry.methods
       .setResolver(address, contractResolver.options.address)
       .send(send_options);
+    
+    await contractRegistry.methods
+      .setOwner(address, contractAlpressRegistrar.options.address)
+      .send(send_options);
   }
+
+  await contractAlpressRegistrar.methods
+    .setDefaultResolver(contractResolver.options.address)
+    .send(send_options);
 
   t.context['ens'] = {
     address: address,
@@ -117,7 +125,7 @@ test.before(async t => {
     sendOptions: send_options,
     web3: web3
   };
-  t.context['dlog'] = new DLog(ipfs, web3);
+  t.context['dlog'] = new DLog(ipfs, web3, contractAlpressRegistrar.options.address);
   t.context['alpress'] = contractAlpressRegistrar;
 });
 
@@ -236,21 +244,15 @@ test('put/get identity', async t => {
 
 test('register', async t => {
   const dlog = t.context['dlog'];
-  const { address, resolver, sendOptions } = t.context['ens'];
+  const { resolver, sendOptions, web3 } = t.context['ens'];
   const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
   const author_cid = await dlog.putAuthor(author);
   const identity = new Identity(author_cid);
-  const identity_cid = await dlog.createIdentity(identity);
-  // await dlog.register(
-  //   'mdtsomething.eth',
-  //   identity,
-  //   sendOptions
-  // );
-  await resolver
-    .setContenthash(address, getBytes32FromIpfsHash(identity_cid.toString()))
-    .send(sendOptions);
-  const content = await resolver.contenthash(address).call();
-  const content_hash = getIpfsHashFromBytes32(content);
+  await dlog.register('testing', identity, sendOptions);
+  const sub_address = namehash.hash('testing.alpress.eth');
+  const content = await resolver.contenthash(sub_address).call();
+  console.log('content', content)
+  const content_hash = contentHash.decode(web3.utils.toAscii(content));
   const retrieved_identity = await dlog.retrieveIdentity(content_hash);
   t.is(retrieved_identity.author.toString(), identity.author.toString());
 });
@@ -279,9 +281,7 @@ test('Alpress Contract > non-allocated expiration', async t => {
 
 test('Alpress Contract > buy', async t => {
   const contract = t.context['alpress'];
-  const { address, registry, sendOptions, web3 } = t.context['ens'];
-
-  await registry.setOwner(address, contract.options.address).send(sendOptions);
+  const { sendOptions, web3 } = t.context['ens'];
 
   await contract.methods.buy('mdt').send({
     ...sendOptions,
@@ -319,19 +319,6 @@ test('Alpress Contract > set price', async t => {
   const priceResult = await contract.methods.getPrice().call();
 
   t.is(priceResult, '5000000000000000');
-});
-
-test('Alpress Contract > set default resolver', async t => {
-  const contract = t.context['alpress'];
-  const { sendOptions } = t.context['ens'];
-
-  await contract.methods
-    .setDefaultResolver('0xc257274276a4e539741ca11b590b9447b26a8051')
-    .send(sendOptions);
-
-  const newAddress = await contract.methods.resolver().call();
-
-  t.is(newAddress, '0xC257274276a4E539741Ca11b590B9447B26A8051');
 });
 
 test('Alpress Contract > renew domain', async t => {
@@ -421,22 +408,22 @@ function getRootNodeFromTLD(
   };
 }
 
-function getBytes32FromIpfsHash(hash: string): string {
-  return `0x${bs58
-    .decode(hash)
-    .slice(2)
-    .toString('hex')}`;
-}
+// function getBytes32FromIpfsHash(hash: string): string {
+//   return `0x${bs58
+//     .decode(hash)
+//     .slice(2)
+//     .toString('hex')}`;
+// }
 
-function getIpfsHashFromBytes32(bytes32Hex: string): string {
-  // Add our default ipfs values for first 2 bytes:
-  // function:0x12=sha2, size:0x20=256 bits
-  // and cut off leading "0x"
-  const hashHex = '1220' + bytes32Hex.slice(2);
-  const hashBytes = Buffer.from(hashHex, 'hex');
-  const hashStr = bs58.encode(hashBytes);
-  return hashStr;
-}
+// function getIpfsHashFromBytes32(bytes32Hex: string): string {
+//   // Add our default ipfs values for first 2 bytes:
+//   // function:0x12=sha2, size:0x20=256 bits
+//   // and cut off leading "0x"
+//   const hashHex = '1220' + bytes32Hex.slice(2);
+//   const hashBytes = Buffer.from(hashHex, 'hex');
+//   const hashStr = bs58.encode(hashBytes);
+//   return hashStr;
+// }
 
 function timeTravel(
   web3: { currentProvider: AbstractProvider },
