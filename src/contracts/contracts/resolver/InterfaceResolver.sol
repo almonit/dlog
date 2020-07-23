@@ -3,7 +3,7 @@ pragma solidity >=0.5.0;
 import "./ResolverBase.sol";
 import "./AddrResolver.sol";
 
-contract InterfaceResolver is ResolverBase, AddrResolver {
+abstract contract InterfaceResolver is ResolverBase, AddrResolver {
     bytes4 constant private INTERFACE_INTERFACE_ID = bytes4(keccak256("interfaceImplementer(bytes32,bytes4)"));
     bytes4 private constant INTERFACE_META_ID = 0x01ffc9a7;
 
@@ -59,7 +59,7 @@ contract InterfaceResolver is ResolverBase, AddrResolver {
         return a;
     }
 
-    function supportsInterface(bytes4 interfaceID) public pure returns(bool) {
+    function supportsInterface(bytes4 interfaceID) public override(AddrResolver, ResolverBase) pure virtual returns(bool) {
         return interfaceID == INTERFACE_INTERFACE_ID || super.supportsInterface(interfaceID);
     }
 }

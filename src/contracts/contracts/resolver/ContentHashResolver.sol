@@ -2,7 +2,7 @@ pragma solidity >=0.5.0;
 
 import "./ResolverBase.sol";
 
-contract ContentHashResolver is ResolverBase {
+abstract contract ContentHashResolver is ResolverBase {
     bytes4 constant private CONTENT_HASH_INTERFACE_ID = 0xbc1c58d1;
 
     event ContenthashChanged(bytes32 indexed node, bytes hash);
@@ -29,7 +29,7 @@ contract ContentHashResolver is ResolverBase {
         return hashes[node];
     }
 
-    function supportsInterface(bytes4 interfaceID) public pure returns(bool) {
+    function supportsInterface(bytes4 interfaceID) public override pure virtual returns(bool) {
         return interfaceID == CONTENT_HASH_INTERFACE_ID || super.supportsInterface(interfaceID);
     }
 }

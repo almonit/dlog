@@ -2,7 +2,7 @@
 // tslint:disable:no-string-literal
 // tslint:disable:no-object-mutation
 import { ENSRegistry, FIFSRegistrar } from '@ensdomains/ens';
-import { PublicResolver } from '@ensdomains/resolver';
+// import { PublicResolver } from '@ensdomains/resolver';
 import test from 'ava';
 import bs58 from 'bs58';
 import contentHash from 'content-hash';
@@ -55,15 +55,16 @@ test.before(async t => {
     })
     .send(send_options);
 
-  const instanceResolver = new web3.eth.Contract(PublicResolver.abi);
+  const instanceResolver = new web3.eth.Contract(AlpressResolver.abi as any);
   const contractResolver = await instanceResolver
     .deploy({
-      data: PublicResolver.bytecode,
+      data: AlpressResolver.bytecode,
       arguments: [contractRegistry.options.address]
     })
     .send(send_options);
 
   const resolverMethods = contractResolver.methods;
+  console.log('resolverMethods', resolverMethods)
 
   const instanceTestRegistrar = new web3.eth.Contract(FIFSRegistrar.abi);
   const contractTestRegistrar = await instanceTestRegistrar

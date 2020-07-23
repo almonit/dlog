@@ -26,16 +26,17 @@ library Buffer {
     * @return The buffer, for chaining.
     */
     function init(buffer memory buf, uint capacity) internal pure returns(buffer memory) {
-        if (capacity % 32 != 0) {
-            capacity += 32 - (capacity % 32);
+        uint _capacity = capacity;
+        if (_capacity % 32 != 0) {
+            _capacity += 32 - (_capacity % 32);
         }
         // Allocate space for the buffer data
-        buf.capacity = capacity;
+        buf.capacity = _capacity;
         assembly {
             let ptr := mload(0x40)
             mstore(buf, ptr)
             mstore(ptr, 0)
-            mstore(0x40, add(32, add(ptr, capacity)))
+            mstore(0x40, add(32, add(ptr, _capacity)))
         }
         return buf;
     }
@@ -204,19 +205,20 @@ library Buffer {
     * @return The original buffer, for chaining.
     */
     function write(buffer memory buf, uint off, bytes32 data, uint len) private pure returns(buffer memory) {
+        bytes32 _data = data;
         if (len + off > buf.capacity) {
             resize(buf, (len + off) * 2);
         }
 
         uint mask = 256 ** len - 1;
         // Right-align data
-        data = data >> (8 * (32 - len));
+        _data = _data >> (8 * (32 - len));
         assembly {
             // Memory address of the buffer data
             let bufptr := mload(buf)
             // Address = buffer address + sizeof(buffer length) + off + len
             let dest := add(add(bufptr, off), len)
-            mstore(dest, or(and(mload(dest), not(mask)), data))
+            mstore(dest, or(and(mload(dest), not(mask)), _data))
             // Update buffer length if we extended it
             if gt(add(off, len), mload(bufptr)) {
                 mstore(bufptr, add(off, len))

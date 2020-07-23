@@ -205,20 +205,22 @@ library BytesUtils {
     }
 
     function memcpy(uint dest, uint src, uint len) private pure {
+        uint _dest = dest;
+        uint _src = src;
         // Copy word-length chunks while possible
         for (; len >= 32; len -= 32) {
             assembly {
-                mstore(dest, mload(src))
+                mstore(_dest, mload(_src))
             }
-            dest += 32;
-            src += 32;
+            _dest += 32;
+            _src += 32;
         }
 
         // Copy remaining bytes
         uint mask = 256 ** (32 - len) - 1;
         assembly {
-            let srcpart := and(mload(src), not(mask))
-            let destpart := and(mload(dest), mask)
+            let srcpart := and(mload(_src), not(mask))
+            let destpart := and(mload(_dest), mask)
             mstore(dest, or(destpart, srcpart))
         }
     }

@@ -2,7 +2,7 @@ pragma solidity >=0.5.0;
 
 import "./ResolverBase.sol";
 
-contract ABIResolver is ResolverBase {
+abstract contract ABIResolver is ResolverBase {
     bytes4 constant private ABI_INTERFACE_ID = 0x2203ab56;
 
     event ABIChanged(bytes32 indexed node, uint256 indexed contentType);
@@ -45,7 +45,7 @@ contract ABIResolver is ResolverBase {
         return (0, bytes(""));
     }
 
-    function supportsInterface(bytes4 interfaceID) public pure returns(bool) {
+    function supportsInterface(bytes4 interfaceID) public override pure virtual returns(bool) {
         return interfaceID == ABI_INTERFACE_ID || super.supportsInterface(interfaceID);
     }
 }

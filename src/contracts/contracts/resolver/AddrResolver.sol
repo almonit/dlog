@@ -2,7 +2,7 @@ pragma solidity >=0.5.0;
 
 import "./ResolverBase.sol";
 
-contract AddrResolver is ResolverBase {
+abstract contract AddrResolver is ResolverBase {
     bytes4 constant private ADDR_INTERFACE_ID = 0x3b3b57de;
     bytes4 constant private ADDRESS_INTERFACE_ID = 0xf1cb7e06;
     uint constant private COIN_TYPE_ETH = 60;
@@ -47,7 +47,7 @@ contract AddrResolver is ResolverBase {
         return _addresses[node][coinType];
     }
 
-    function supportsInterface(bytes4 interfaceID) public pure returns(bool) {
+    function supportsInterface(bytes4 interfaceID) public override pure virtual returns(bool) {
         return interfaceID == ADDR_INTERFACE_ID || interfaceID == ADDRESS_INTERFACE_ID || super.supportsInterface(interfaceID);
     }
 }

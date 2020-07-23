@@ -33,7 +33,7 @@ library RRUtils {
     * @dev Returns a DNS format name at the specified offset of self.
     * @param self The byte array to read a name from.
     * @param offset The offset to start reading at.
-    * @return The name.
+    * @return ret The name.
     */
     function readName(bytes memory self, uint offset) internal pure returns(bytes memory ret) {
         uint len = nameLength(self, offset);
@@ -47,11 +47,12 @@ library RRUtils {
     * @return The number of labels in the DNS name at 'offset', in bytes.
     */
     function labelCount(bytes memory self, uint offset) internal pure returns(uint) {
+        uint _offset = offset;
         uint count = 0;
         while (true) {
-            assert(offset < self.length);
-            uint labelLen = self.readUint8(offset);
-            offset += labelLen + 1;
+            assert(_offset < self.length);
+            uint labelLen = self.readUint8(_offset);
+            _offset += labelLen + 1;
             if (labelLen == 0) {
                 break;
             }
@@ -77,7 +78,7 @@ library RRUtils {
     * @dev Begins iterating over resource records.
     * @param self The byte string to read from.
     * @param offset The offset to start reading at.
-    * @return An iterator object.
+    * @return ret An iterator object.
     */
     function iterateRRs(bytes memory self, uint offset) internal pure returns (RRIterator memory ret) {
         ret.data = self;
