@@ -10,7 +10,7 @@ contract Alpress {
     bytes32 constant platform = keccak256(bytes('alpress'));
     bytes32
         public constant TLD_NODE = 0x93cdeb708b7545dc668eb9280176169d1c33cfd8ed6f04690a0bcc88a93fc4ae; // namehash('eth')
-    bytes32 platformNode = keccak256(abi.encodePacked(TLD_NODE, platform));
+    bytes32 platformNode = keccak256(abi.encodePacked(TLD_NODE, platform)); //TODO hardcode maybe?
     AlpressResolver public resolver; // ENS standard resolver
     address private almonit;
     //address almonit = 0xC741cdDa197Af87Acd54a4A5f563C8efDbc754B7; // Almonit multisig account
@@ -34,7 +34,6 @@ contract Alpress {
     }
 
     mapping(bytes32 => Blog) blogs;
-    mapping(bytes32 => bytes) hashes;
 
     constructor(ENS _ens, AlpressResolver _resolver) public {
         ens = _ens;
@@ -216,15 +215,5 @@ contract Alpress {
 
     function getPrice() external view returns (uint256 price) {
         price = rentPricePerYear;
-    }
-
-    function getContent(string calldata name)
-        external
-        view
-        returns (bytes memory)
-    {
-        bytes32 label = keccak256(bytes(name));
-        bytes32 blogNode = keccak256(abi.encodePacked(platformNode, label));
-        return hashes[blogNode];
     }
 }
