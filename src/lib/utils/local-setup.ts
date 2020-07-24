@@ -1,12 +1,12 @@
 import { ENSRegistry, FIFSRegistrar } from '@ensdomains/ens';
-import { PublicResolver } from '@ensdomains/resolver';
 import namehash from 'eth-ens-namehash';
 import IPFS from 'ipfs';
 import Web3 from 'web3';
 import { AbstractProvider } from 'web3-core/types';
 
-import { AlpressRegistrar } from '../../contracts';
 import getRootNodeFromTLD from './root-node';
+import { AlpressResolver, AlpressRegistrar } from '../../contracts';
+
 const ganache = require('ganache-core');
 
 export default async function localSetup(provider = null): Promise<any> {
@@ -48,11 +48,27 @@ export default async function localSetup(provider = null): Promise<any> {
     })
     .send(send_options);
 
-  const instanceResolver = new web3.eth.Contract(PublicResolver.abi);
+  const instanceAlpressRegistrar = new web3.eth.Contract(
+    AlpressRegistrar.abi as any
+  );
+  const contractAlpressRegistrar = await instanceAlpressRegistrar
+    .deploy({
+      data: AlpressRegistrar.bytecode,
+      arguments: [
+        contractRegistry.options.address,
+        '0x0000000000000000000000000000000000000000'
+      ]
+    })
+    .send(send_options);
+
+  const instanceResolver = new web3.eth.Contract(AlpressResolver.abi as any);
   const contractResolver = await instanceResolver
     .deploy({
-      data: PublicResolver.bytecode,
-      arguments: [contractRegistry.options.address]
+      data: AlpressResolver.bytecode,
+      arguments: [
+        contractRegistry.options.address,
+        contractAlpressRegistrar.options.address
+      ]
     })
     .send(send_options);
 
@@ -65,21 +81,6 @@ export default async function localSetup(provider = null): Promise<any> {
       arguments: [contractRegistry.options.address, rootNode.namehash]
     })
     .send(send_options);
-
-  const instanceAlpressRegistrar = new web3.eth.Contract(
-    AlpressRegistrar.abi as any
-  );
-  const contractAlpressRegistrar = await instanceAlpressRegistrar
-    .deploy({
-      data: AlpressRegistrar.bytecode,
-      arguments: [
-        contractRegistry.options.address,
-        contractResolver.options.address
-      ]
-    })
-    .send(send_options);
-
-  console.log('public: ', contractTestRegistrar.options.address);
 
   await contractRegistry.methods
     .setSubnodeOwner(
@@ -99,10 +100,14 @@ export default async function localSetup(provider = null): Promise<any> {
     await contractRegistry.methods
       .setResolver(address, contractResolver.options.address)
       .send(send_options);
+    
+    await contractRegistry.methods
+      .setOwner(address, contractAlpressRegistrar.options.address)
+      .send(send_options);
   }
 
-  await contractRegistry.methods
-    .setOwner(address, contractAlpressRegistrar.options.address)
+  await contractAlpressRegistrar.methods
+    .setDefaultResolver(contractResolver.options.address)
     .send(send_options);
 
   return {
