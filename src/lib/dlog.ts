@@ -22,7 +22,11 @@ export class DLog {
   public static readonly INDEX_FILE: string = 'index.html';
   public alpress;
 
-  constructor(public node: IPFS, public web3: Web3 | any = null, alpress_address: string = '') {
+  constructor(
+    public node: IPFS,
+    public web3: Web3 | any = null,
+    alpress_address: string = ''
+  ) {
     this.node = node;
     this.web3 = web3;
     this.alpress = new web3.eth.Contract(AlpressRegistrar.abi, alpress_address);
@@ -314,6 +318,11 @@ export class DLog {
     return result;
   }
 
+  public async checkTaken(domain: string): Promise<boolean> {
+    const takenResult = await this.alpress.methods.checkTaken(domain).call();
+    return takenResult;
+  }
+
   /**
    * Return versions of all active libraries
    */
@@ -401,4 +410,12 @@ export class DLog {
     const replace = new RegExp(separator + '{1,}', 'g');
     return parts.join(separator).replace(replace, separator);
   }
+  // private getBytes32FromIpfsHash(hash: string): string {
+  //   return `0x${bs58
+  //     .decode(hash)
+  //     .slice(2)
+  //     .toString('hex')}`;
+  // }
 }
+
+export * from './utils';
