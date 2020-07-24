@@ -7,7 +7,13 @@ import { IPFSPath } from 'ipfs/types/interface-ipfs-core/common';
 import Web3 from 'web3';
 import { AlpressRegistrar } from '../contracts';
 
-import { Article, ArticleSummary, Author, Bucket, Identity } from './models';
+import {
+  Article,
+  ArticleSummary,
+  Author,
+  Bucket,
+  Identity
+} from './models';
 
 export class DLog {
   public static readonly AUTHOR_PAGE: string =
