@@ -1,5 +1,4 @@
-// pragma solidity >=0.6.10;
-pragma solidity >=0.5.0;
+pragma solidity >=0.6.10;
 
 import './ENS.sol';
 import './FIFSRegistrar.sol';
