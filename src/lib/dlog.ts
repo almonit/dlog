@@ -84,10 +84,6 @@ export class DLog {
     );
     const bucket_info = await this.getBucket(bucket_cid);
     bucket.loadBucket(bucket_info);
-    //TODO: removed this, no need to
-    // if (bucket.size() >= Bucket.BUCKET_LIMIT) {
-    //   return new Bucket([], bucket_cid);
-    // }
     return bucket;
   }
 
