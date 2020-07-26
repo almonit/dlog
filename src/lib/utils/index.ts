@@ -1,4 +1,4 @@
 import localSetup from './local-setup';
-import getRootNodeFromTLD from './root-node';
+import getRootNodeFromTLD from './hash';
 
 export default { localSetup, getRootNodeFromTLD };

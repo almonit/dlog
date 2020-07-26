@@ -1,10 +1,9 @@
 import { ENSRegistry, FIFSRegistrar } from '@ensdomains/ens';
-import namehash from 'eth-ens-namehash';
 import IPFS from 'ipfs';
 import Web3 from 'web3';
 import { AbstractProvider } from 'web3-core/types';
 
-import getRootNodeFromTLD from './root-node';
+// import getNameHashSHA3 from './hash';
 import { AlpressResolver, AlpressRegistrar } from '../../contracts';
 
 const ganache = require('ganache-core');
@@ -15,8 +14,7 @@ export default async function localSetup(provider = null): Promise<any> {
   await ipfs.bootstrap.add(
     '/ip4/95.179.128.10/tcp/5001/p2p/QmYDZk4ns1qSReQoZHcGa8jjy8SdhdAqy3eBgd1YMgGN9j'
   );
-  // const provider = new Web3.providers.HttpProvider('http://localhost:7545');
-  if(!provider)
+  if (!provider)
     provider = ganache.provider({
       allowUnlimitedContractSize: true,
       gasLimit: 3000000000,
@@ -27,14 +25,21 @@ export default async function localSetup(provider = null): Promise<any> {
     // 'https://:62ff7188c74447b6a67afbc2de247610@ropsten.infura.io/v3/372375d582d843c48a4eaee6aa5c1b3a'
   );
 
-  const address_label = web3.utils.sha3('alpress');
-  const address = namehash.hash('alpress.eth');
-  const rootNode = getRootNodeFromTLD(web3, 'eth');
+  // const address_label = getNameHashSHA3(web3, 'alpress').sha3;
+  const address_label =
+    '0xefa02a3c3d5ae7bcd3eb19a279dee2d2584e97a31cb9a3d54eed0182bd398d80';
+  // const address = getNameHashSHA3(web3, 'alpress.eth').namehash;
+  const address =
+    '0x517e65c2f5c4feaca79a1ad6dbb71e140e197bdac570080818992818f6a23065';
+  // const rootNode = getNameHashSHA3(web3, 'eth');
+  const rootNode = {
+    namehash:
+      '0x93cdeb708b7545dc668eb9280176169d1c33cfd8ed6f04690a0bcc88a93fc4ae',
+    sha3: '0x4f5b812789fc606be1b3b16908db13fc7a9adf7ca72641f84d75b47069d3d7f0'
+  };
   const accounts = await web3.eth.getAccounts();
   const main_account = accounts[0];
-  // const RegistryContract = '0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e';
-  // const FIFSRegistrarContract = '0x21397c1A1F4aCD9132fE36Df011610564b87E24b';
-  // const PublicResolverContract = '0xde469c7106a9fbc3fb98912bb00be983a89bddca';
+  const empty_account = '0x0000000000000000000000000000000000000000';
   const send_options = {
     gas: 5000000,
     gasPrice: '3000000',
@@ -54,10 +59,7 @@ export default async function localSetup(provider = null): Promise<any> {
   const contractAlpressRegistrar = await instanceAlpressRegistrar
     .deploy({
       data: AlpressRegistrar.bytecode,
-      arguments: [
-        contractRegistry.options.address,
-        '0x0000000000000000000000000000000000000000'
-      ]
+      arguments: [contractRegistry.options.address, empty_account]
     })
     .send(send_options);
 
@@ -72,8 +74,6 @@ export default async function localSetup(provider = null): Promise<any> {
     })
     .send(send_options);
 
-  const resolverMethods = contractResolver.methods;
-
   const instanceTestRegistrar = new web3.eth.Contract(FIFSRegistrar.abi);
   const contractTestRegistrar = await instanceTestRegistrar
     .deploy({
@@ -84,7 +84,7 @@ export default async function localSetup(provider = null): Promise<any> {
 
   await contractRegistry.methods
     .setSubnodeOwner(
-      '0x0000000000000000000000000000000000000000',
+      empty_account,
       rootNode.sha3,
       contractTestRegistrar.options.address
     )
@@ -92,7 +92,7 @@ export default async function localSetup(provider = null): Promise<any> {
 
   const owner = await contractRegistry.methods.owner(address).call();
 
-  if (owner === '0x0000000000000000000000000000000000000000') {
+  if (owner === empty_account) {
     await contractTestRegistrar.methods
       .register(address_label, main_account)
       .send(send_options);
@@ -100,7 +100,7 @@ export default async function localSetup(provider = null): Promise<any> {
     await contractRegistry.methods
       .setResolver(address, contractResolver.options.address)
       .send(send_options);
-    
+
     await contractRegistry.methods
       .setOwner(address, contractAlpressRegistrar.options.address)
       .send(send_options);
@@ -116,7 +116,7 @@ export default async function localSetup(provider = null): Promise<any> {
     contractRegistry,
     ipfs,
     main_account,
-    resolverMethods,
+    contractResolver,
     send_options,
     web3
   };

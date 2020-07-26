@@ -1,35 +1,37 @@
 // import all from 'it-all';
-import CID from 'cids';
 import BufferList from 'bl';
+import CID from 'cids';
 import contentHash from 'content-hash';
 import IPFS from 'ipfs';
 import { IPFSPath } from 'ipfs/types/interface-ipfs-core/common';
+import namehash from 'eth-ens-namehash';
 import Web3 from 'web3';
-import { AlpressRegistrar } from '../contracts';
+import { AlpressRegistrar, AlpressResolver } from '../contracts';
 
-import {
-  Article,
-  ArticleSummary,
-  Author,
-  Bucket,
-  Identity
-} from './models';
+import { Article, ArticleSummary, Author, Bucket, Identity } from './models';
 
 export class DLog {
+  public static readonly ROOT_DOMAIN: string = 'alpress.eth';
   public static readonly AUTHOR_PAGE: string =
     '/ipfs/QmamDJKm5DtpxtHdF8raZm4Nz7QV19WQSyP64sdUQKDFfi';
   public static readonly IDENTITY_FILE: string = 'identity.json';
   public static readonly INDEX_FILE: string = 'index.html';
   public alpress;
+  public resolver;
 
   constructor(
     public node: IPFS,
     public web3: Web3 | any = null,
-    alpress_address: string = ''
+    alpress_address: string = '',
+    alpress_resolver_address: string = ''
   ) {
     this.node = node;
     this.web3 = web3;
     this.alpress = new web3.eth.Contract(AlpressRegistrar.abi, alpress_address);
+    this.resolver = new web3.eth.Contract(
+      AlpressResolver.abi,
+      alpress_resolver_address
+    );
   }
 
   /* Public methods */
@@ -61,21 +63,31 @@ export class DLog {
    * and lastly will read the `buckets` key of the `identity.json`
    * then return the latest bucket CID
    *
-   * @param ens_address ENS address e.g. 'mdt.eth'
+   * @param subdomain ENS address e.g. 'mdt.eth'
    */
-  public async retrieveLatestBucket(ens_address: string): Promise<Bucket> {
-    const content_hash: string = await this.getContentHash(ens_address);
+  public async retrieveLatestBucket(subdomain: string): Promise<Bucket> {
+    const content_hash: string = await this.getContent(subdomain);
     const identity: Identity = await this.retrieveIdentity(content_hash);
     // TO DO be sure returned object is casted into Identity model
     // otherwise the one below will not work
-    const bucket_cid = identity.getBucketCID(0);
-    const bucket: Bucket = await this.getBucket(bucket_cid);
+    let bucket_cid: any = identity.getBucketCID(0);
+    const bucket = new Bucket([]);
+    bucket.setIndex(1);
 
+    if (!bucket_cid) {
+      return bucket;
+    }
+    bucket_cid = new CID(
+      1,
+      bucket_cid.codec,
+      Buffer.from(bucket_cid.hash.data)
+    );
+    const bucket_info = await this.getBucket(bucket_cid);
+    bucket.loadBucket(bucket_info);
     //TODO: removed this, no need to
     // if (bucket.size() >= Bucket.BUCKET_LIMIT) {
     //   return new Bucket([], bucket_cid);
     // }
-
     return bucket;
   }
 
@@ -105,23 +117,24 @@ export class DLog {
    * @param article Article Object
    */
   public async publishArticle(
-    ens_address: string,
-    article: Article
+    subdomain: string,
+    article: Article,
+    options: object
   ): Promise<void> {
     const article_cid: IPFSPath = await this.putArticle(article);
     const { author, cover_image } = article;
     // TO DO think of a way to extract summary, title for Article Summary model
-    const article_summary: ArticleSummary = {
+    const article_summary = {
       author: author[0].toString(),
       content: article_cid,
       cover_image,
-      summary: '',
-      title: ''
+      summary: 'Test Demo',
+      title: 'Test Demo'
     };
 
     const article_summary_cid = await this.putArticleSummary(article_summary);
 
-    let bucket: Bucket = await this.retrieveLatestBucket(ens_address);
+    let bucket: Bucket = await this.retrieveLatestBucket(subdomain);
     const [updated_bucket_cid, need_archiving] = await this.addArticleToBucket(
       article_summary_cid,
       bucket
@@ -134,8 +147,16 @@ export class DLog {
       need_archiving
     );
 
-    // TO DO continue for return
-    // have additional method on identity;
+    const content_hash: string = await this.getContent(subdomain);
+    const identity: Identity = await this.retrieveIdentity(content_hash);
+
+    identity.updateBucket(updated_bucket_cid, need_archiving);
+
+    const user_cid: IPFSPath = await this.createIdentity(identity);
+    const result = await this.alpress.methods
+      .publish(subdomain, contentHash.fromIpfs(user_cid.toString()))
+      .send(options);
+    return result;
   }
 
   public async addArticleToBucket(
@@ -274,7 +295,10 @@ export class DLog {
     await this.node.files.write(
       this.pathJoin(['/stuff', DLog.IDENTITY_FILE]),
       identity.asBuffer(),
-      { create: true }
+      {
+        create: true,
+        truncate: true
+      }
     );
     await this.cp(
       DLog.AUTHOR_PAGE,
@@ -307,7 +331,8 @@ export class DLog {
     identity: Identity,
     options?: object
   ): Promise<string> {
-    const user_cid = await this.createIdentity(identity);
+    const _identity = new Identity(identity.author);
+    const user_cid = await this.createIdentity(_identity);
     await this.alpress.methods.buy(subdomain).send({
       ...options,
       value: this.web3.utils.toWei('0.005', 'ether')
@@ -382,10 +407,17 @@ export class DLog {
     }
   }
 
-  private async getContentHash(ens_address: string): Promise<string> {
-    const content_hash: string = await this.web3.eth.ens.getContent(
-      ens_address
-    );
+  // private async getContentHash(ens_address: string): Promise<string> {
+  //   const content_hash: string = await this.web3.eth.ens.getContent(
+  //     ens_address
+  //   );
+  //   return content_hash;
+  // }
+
+  public async getContent(subdomain): Promise<string> {
+    const sub_address = namehash.hash(`${subdomain}.${DLog.ROOT_DOMAIN}`);
+    const content = await this.resolver.methods.contenthash(sub_address).call();
+    const content_hash = contentHash.decode(this.web3.utils.toAscii(content));
     return content_hash;
   }
 
@@ -403,7 +435,7 @@ export class DLog {
     for await (const chunk of chunks) {
       content.append(chunk);
     }
-    return content.toString('utf8');
+    return content.toString('utf-8');
   }
 
   private pathJoin(parts: String[], separator: string = '/') {

@@ -3,7 +3,6 @@
 // tslint:disable:no-object-mutation
 import test from 'ava';
 import contentHash from 'content-hash';
-import namehash from 'eth-ens-namehash';
 
 import { DLog } from './dlog';
 import { Article, ArticleSummary, Author, Bucket, Identity } from './models';
@@ -16,7 +15,7 @@ test.before(async t => {
     contractRegistry,
     ipfs,
     main_account,
-    resolverMethods,
+    contractResolver,
     send_options,
     web3
   } = await localSetup();
@@ -25,14 +24,15 @@ test.before(async t => {
     address: address,
     account: main_account,
     registry: contractRegistry.methods,
-    resolver: resolverMethods,
+    resolver: contractResolver.methods,
     sendOptions: send_options,
     web3: web3
   };
   t.context['dlog'] = new DLog(
     ipfs,
     web3,
-    contractAlpressRegistrar.options.address
+    contractAlpressRegistrar.options.address,
+    contractResolver.options.address
   );
   t.context['alpress'] = contractAlpressRegistrar;
 });
@@ -152,15 +152,12 @@ test('put/get identity', async t => {
 
 test('register', async t => {
   const dlog = t.context['dlog'];
-  const { resolver, sendOptions, web3 } = t.context['ens'];
+  const { sendOptions } = t.context['ens'];
   const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
   const author_cid = await dlog.putAuthor(author);
   const identity = new Identity(author_cid);
   await dlog.register('testing', identity, sendOptions);
-  const sub_address = namehash.hash('testing.alpress.eth');
-  const content = await resolver.contenthash(sub_address).call();
-  console.log('content', content)
-  const content_hash = contentHash.decode(web3.utils.toAscii(content));
+  const content_hash = await dlog.getContent('testing');
   const retrieved_identity = await dlog.retrieveIdentity(content_hash);
   t.is(retrieved_identity.author.toString(), identity.author.toString());
 });

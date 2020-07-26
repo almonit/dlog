@@ -5,7 +5,6 @@ export class Bucket implements Bucket {
   public static readonly NON_ARCHIVE_LIMIT = 3; // number of non-archived buckets
   private previous_bucket?: IPFSPath;
   private index!: number; // -1 (if archived), or between 1 and MAX_LIVE_INDEX otherwise
-  // -1 (if archived), or between 1 and MAX_LIVE_INDEX otherwise
   private articles: IPFSPath[];
 
   constructor(
