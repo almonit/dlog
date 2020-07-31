@@ -210,6 +210,96 @@ export class DLog {
     return [updated_bucket_cid, need_archiving];
   }
 
+  /**
+   * removes an article from the dlog.
+   * function uses recursive search to find the bucket that has the article.
+   * it deletes the articles from the bucket,  and updates recursively all the CIDs. 
+   * @param  {IPFSPath} article_summary_cid [description]
+   * @param  {Bucket}   bucket              bucket from which function start to look for the article
+   * @return {Promise}                      returns [CID of updated bucket, true] if article was found
+   *                                        or [nul, false] otherwise.
+   */
+  public async removeArticle(
+    article_summary_cid: IPFSPath,
+    bucket: Bucket
+  ): Promise<IPFSPath | null> {
+    let updated_bucket_cid: IPFSPath | null = null;
+    let bucket_cid_update_needed: boolean = false;
+
+    // search article in bucket
+    let article_index = bucket.searchArticle(article_summary_cid);
+
+    // if found, remove article
+    if (article_index > -1) {
+      bucket.removeArticle(article_index);
+      bucket_cid_update_needed = true;
+
+    // if not found, search recursively in previous bucket
+    } else {
+      let previous_bucket_cid = bucket.getPreviousBucket();
+      if (previous_bucket_cid) {
+        
+        // create a bucket object from previous_bucket_cid
+        let previous: Bucket = await this.getBucket(previous_bucket_cid);
+        let previous_bucket = new Bucket([]);
+        previous_bucket.loadBucket(previous);
+        
+        updated_bucket_cid = await this.removeArticle(article_summary_cid, previous_bucket)
+
+        if (updated_bucket_cid) {
+          bucket.setPreviousBucket(updated_bucket_cid);
+          bucket_cid_update_needed = true;          
+        }
+      }
+    }
+
+    if (bucket_cid_update_needed)
+      updated_bucket_cid = await this.putBucket(bucket);
+    
+    return updated_bucket_cid;
+  }
+
+  public async replaceArticle(
+    old_article_summary_cid: IPFSPath,
+    new_article_summary_cid: IPFSPath,
+    bucket: Bucket
+  ): Promise<IPFSPath | null> {
+    let updated_bucket_cid: IPFSPath | null = null;
+    let bucket_cid_update_needed: boolean = false;
+
+    // search article in bucket
+    let old_article_index = bucket.searchArticle(old_article_summary_cid);
+
+    // if found, modify article
+    if (old_article_index > -1) {
+      bucket.replaceArticle(old_article_index, new_article_summary_cid);
+      bucket_cid_update_needed = true;
+
+    // if not found, search recursively in previous bucket
+    } else {
+      let previous_bucket_cid = bucket.getPreviousBucket();
+      if (previous_bucket_cid) {
+        
+        // create a bucket object from previous_bucket_cid
+        let previous: Bucket = await this.getBucket(previous_bucket_cid);
+        let previous_bucket = new Bucket([]);
+        previous_bucket.loadBucket(previous);
+        
+        updated_bucket_cid = await this.replaceArticle(old_article_summary_cid, new_article_summary_cid, previous_bucket)
+
+        if (updated_bucket_cid) {
+          bucket.setPreviousBucket(updated_bucket_cid);
+          bucket_cid_update_needed = true;          
+        }
+      }
+    }
+
+    if (bucket_cid_update_needed)
+      updated_bucket_cid = await this.putBucket(bucket);
+    
+    return updated_bucket_cid;
+  }
+
   public async archiving(bucket: Bucket): Promise<Bucket> {
     let previous: Bucket = await this.getBucket(
       bucket.getPreviousBucket() as IPFSPath

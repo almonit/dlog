@@ -48,6 +48,35 @@ export class Bucket implements Bucket {
   }
 
   /**
+   * remove article with a given index
+   * @param {number} index [description]
+   */
+  public removeArticle(index: number) {
+    if (index < this.articles.length)
+      this.articles.splice(index, 1)
+    // TODO: else throw error, "index is longer than number of articles"
+  }
+
+  /**
+   * [searchArticle description]
+   * @param  {IPFSPath} article_summary_cid [description]
+   * @return {number}                       [description]
+   */
+  public searchArticle(article_summary_cid: IPFSPath): number {
+    return this.articles.indexOf(article_summary_cid);
+  }  
+
+  /**
+   * replace article in a given index with a new versoin
+   * @param {number} index [description]
+   */
+  public replaceArticle(index: number, new_article_summary_cid: IPFSPath) {
+    if (index < this.articles.length)
+      this.articles[index] = new_article_summary_cid;
+    // TODO: else throw error, "index is longer than number of articles"
+  }
+
+  /**
    * size of bucket
    */
   public size(): number {
