@@ -3,63 +3,63 @@ import { IPFSPath } from 'ipfs/types/interface-ipfs-core/common';
 export class Bucket implements Bucket {
   public static readonly BUCKET_LIMIT = 10;
   public static readonly NON_ARCHIVE_LIMIT = 3; // number of non-archived buckets
-  private previous_bucket?: IPFSPath;
+  private previous_bucket_cid?: IPFSPath;
+  private article_header_cids: IPFSPath[]; // each IPFSPath links to an articleHeader object
   private index!: number; // -1 (if archived), or between 1 and MAX_LIVE_INDEX otherwise
-  private articles: IPFSPath[];
 
   constructor(
-    articles: IPFSPath[] = [],
-    previous_bucket: IPFSPath | any = null
+    article_header_cids: IPFSPath[] = [],
+    previous_bucket_cid: IPFSPath | any = null
   ) {
-    this.articles = articles;
-    this.previous_bucket = previous_bucket;
+    this.article_header_cids = article_header_cids;
+    this.previous_bucket_cid = previous_bucket_cid;
   }
   /**
    *
-   * @param article_summary_cid [Refers CID of Article Summary Object]
+   * @param articleHeader CID [Refers CID of ArticleHeader Object]
    */
-  public addArticle(article_summary_cid: IPFSPath): void {
-    this.articles.unshift(article_summary_cid);
+  public addArticleHeaderCID(article_header_cid: IPFSPath): void {
+    this.article_header_cids.unshift(article_header_cid);
   }
 
   /**
-   * @param {IPFSPath[]} array of article summary CIDs
+   * @param {IPFSPath[]} array of articleHeader CIDs
    */
-  public addArticles(article_summary_CIDs: IPFSPath[]): void {
-    for (let i = 0; i < article_summary_CIDs.length; i++) {
-      this.articles.unshift(article_summary_CIDs[i]);
+  public addArticleHeaderCIDs(article_header_cids: IPFSPath[]): void {
+    for (let i = 0; i < article_header_cids.length; i++) {
+      this.article_header_cids.unshift(article_header_cids[i]);
     }
   }
 
   /**
    *
-   * @param index Index of article summary object
+   * @param Index in the bucket of the CID of an articleHeader
    */
-  public getArticle(index: number): IPFSPath {
-    return this.articles[index];
+  public getArticleHeaderCID(index: number): IPFSPath {
+    return this.article_header_cids[index];
   }
 
   /**
    *
-   * @param removes the last article and returns its CID
+   * @param removes the CID of last ArticleHeader and returns its CID
    */
-  public removeLastArticle(): IPFSPath {
-    return this.articles.pop() as IPFSPath;
+  public removeLastArticleHeaderCID(): IPFSPath {
+    return this.article_header_cids.pop() as IPFSPath;
   }
 
   /**
    * size of bucket
    */
   public size(): number {
-    return this.articles.length;
+    return this.article_header_cids.length;
   }
 
-  public setPreviousBucket(cid: IPFSPath): void {
-    this.previous_bucket = cid;
+  public setPreviousBucketCID(bucket_cid: IPFSPath): void {
+    this.previous_bucket_cid = bucket_cid;
   }
 
-  public getPreviousBucket(): IPFSPath | undefined {
-    return this.previous_bucket;
+  public getPreviousBucketCID(): IPFSPath | undefined {
+    return this.previous_bucket_cid;
   }
 
   public getIndex(): number {
@@ -71,8 +71,8 @@ export class Bucket implements Bucket {
   }
 
   public loadBucket(bucket: Bucket): void {
-    this.articles = bucket.articles;
-    this.previous_bucket = bucket.previous_bucket;
+    this.article_header_cids = bucket.article_header_cids;
+    this.previous_bucket_cid = bucket.previous_bucket_cid;
     if (bucket.index >= -1)
       this.index = bucket.index;
   }
