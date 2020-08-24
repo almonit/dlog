@@ -67,9 +67,9 @@ export class DLog {
    *
    * @param subdomain ENS address e.g. 'mdt.eth'
    */
-  public async retrieveLatestBucket(subdomain: string): Promise<Bucket> {
+  public async retrieveLatestBucket(): Promise<Bucket> {
     if(!this.subdomain) throw new Error("We couldn't find your account.");
-    const content_hash: string = await this.getContent(subdomain);
+    const content_hash: string = await this.getContent(this.subdomain);
     const identity: Identity = await this.retrieveIdentity(content_hash);
     // TO DO be sure returned object is casted into Identity model
     // otherwise the one below will not work
@@ -123,17 +123,17 @@ export class DLog {
     const article_cid: IPFSPath = await this.putArticle(article);
     const { author, cover_image } = article;
     // TO DO think of a way to extract summary, title for Article Summary model
-    const article_summary = {
-      author: author[0].toString(),
-      content: article_cid,
-      cover_image,
-      summary: 'Test Demo',
-      title: 'Test Demo'
-    };
+    const article_summary = new ArticleSummary(
+      author, 
+      article_cid, 
+      cover_image, 
+      'Test Demo', 
+      'Test Demo'
+    )
 
     const article_summary_cid = await this.putArticleSummary(article_summary);
 
-    let bucket: Bucket = await this.retrieveLatestBucket(this.subdomain);
+    let bucket: Bucket = await this.retrieveLatestBucket();
     const [updated_bucket_cid, need_archiving] = await this.addArticleToBucket(
       article_summary_cid,
       bucket
@@ -151,7 +151,7 @@ export class DLog {
 
   public async removeArticle(article_summary_cid: IPFSPath, options: object) {
     if(!this.subdomain) throw new Error("We couldn't find your account.");
-    let bucket: Bucket = await this.retrieveLatestBucket(this.subdomain);
+    let bucket: Bucket = await this.retrieveLatestBucket();
     const updated_bucket_cid = await this._removeArticle(
       article_summary_cid,
       bucket
@@ -161,11 +161,22 @@ export class DLog {
 
   public async replaceArticle(
     old_article_summary_cid: IPFSPath,
-    new_article_summary_cid: IPFSPath,
+    new_article: Article,
     options
   ) {
     if(!this.subdomain) throw new Error("We couldn't find your account.");
-    let bucket: Bucket = await this.retrieveLatestBucket(this.subdomain);
+    const article_cid: IPFSPath = await this.putArticle(new_article);
+    const { author, cover_image } = new_article;
+    // TO DO think of a way to extract summary, title for Article Summary model
+    const article_summary = new ArticleSummary(
+      author,
+      article_cid,
+      cover_image,
+      'Test Demo', 
+      'Test Demo'
+    )
+    const new_article_summary_cid = await this.putArticleSummary(article_summary);
+    let bucket: Bucket = await this.retrieveLatestBucket();
     const updated_bucket_cid = await this._replaceArticle(
       old_article_summary_cid,
       new_article_summary_cid,
@@ -474,7 +485,7 @@ export class DLog {
 
   public setSubdomain(): void {
     //TO DO read from chain
-    this.subdomain = ""
+    this.subdomain = "testing"
   }
 
   public async checkTaken(domain: string): Promise<boolean> {

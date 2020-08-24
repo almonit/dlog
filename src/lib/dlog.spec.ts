@@ -162,6 +162,42 @@ test('register', async t => {
   t.is(retrieved_identity.author.toString(), identity.author.toString());
 });
 
+test('publish article', async t => {
+  const dlog = t.context['dlog'];
+  const { sendOptions } = t.context['ens'];
+  const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
+  const article = new Article(author, "test content", "", []);
+  await dlog.publishArticle(article, sendOptions);
+  t.pass();
+});
+
+test('edit article', async t => {
+  const dlog = t.context['dlog'];
+  const { sendOptions } = t.context['ens'];
+  const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
+
+  const article = new Article(author, "test content", "", []);
+  await dlog.publishArticle(article, sendOptions);
+  const { articles: article_cids_old } = await dlog.retrieveLatestBucket();
+  const article2 = new Article(author, "test content 2", "", []);
+  
+  await dlog.replaceArticle(article_cids_old[0], article2, sendOptions);
+  const { articles: article_cids_new } = await dlog.retrieveLatestBucket();
+  t.not(article_cids_old[0].toString(), article_cids_new[0].toString());
+});
+
+test('remove article', async t => {
+  const dlog = t.context['dlog'];
+  const { sendOptions } = t.context['ens'];
+  const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
+  const article = new Article(author, "test content", "", []);
+  await dlog.publishArticle(article, sendOptions);
+  const { articles: article_cids_old } = await dlog.retrieveLatestBucket();
+  await dlog.removeArticle(article_cids_old[0], sendOptions);
+  const { articles: article_cids_new } = await dlog.retrieveLatestBucket();
+  t.assert(article_cids_old.length > article_cids_new.length);
+});
+
 test('Alpress Contract > non-allocated address', async t => {
   const contract = t.context['alpress'];
   const ownerResult = await contract.methods.getOwner('mdt').call();

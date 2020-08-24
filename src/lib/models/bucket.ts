@@ -63,7 +63,9 @@ export class Bucket implements Bucket {
    * @return {number}                       [description]
    */
   public searchArticle(article_summary_cid: IPFSPath): number {
-    return this.articles.indexOf(article_summary_cid);
+    return this.articles.findIndex(
+      cid => cid.toString() === article_summary_cid.toString()
+    );
   }  
 
   /**
