@@ -16,14 +16,16 @@ export class DLog {
     '/ipfs/QmamDJKm5DtpxtHdF8raZm4Nz7QV19WQSyP64sdUQKDFfi';
   public static readonly IDENTITY_FILE: string = 'identity.json';
   public static readonly INDEX_FILE: string = 'index.html';
+
   public alpress;
   public resolver;
+  public subdomain!: string;
 
   constructor(
     public node: IPFS,
     public web3: Web3 | any = null,
-    alpress_address: string = '',
-    alpress_resolver_address: string = ''
+    alpress_address: string,
+    alpress_resolver_address: string
   ) {
     this.node = node;
     this.web3 = web3;
@@ -65,8 +67,9 @@ export class DLog {
    *
    * @param subdomain ENS address e.g. 'mdt.eth'
    */
-  public async retrieveLatestBucket(subdomain: string): Promise<Bucket> {
-    const content_hash: string = await this.getContent(subdomain);
+  public async retrieveLatestBucket(): Promise<Bucket> {
+    if(!this.subdomain) throw new Error("We couldn't find your account.");
+    const content_hash: string = await this.getContent(this.subdomain);
     const identity: Identity = await this.retrieveIdentity(content_hash);
     // TO DO be sure returned object is casted into Identity model
     // otherwise the one below will not work
@@ -113,24 +116,24 @@ export class DLog {
    * @param article Article Object
    */
   public async publishArticle(
-    subdomain: string,
     article: Article,
     options: object
   ): Promise<void> {
+    if(!this.subdomain) throw new Error("We couldn't find your account.");
     const article_cid: IPFSPath = await this.putArticle(article);
     const { author, cover_image } = article;
     // TO DO think of a way to extract summary, title for Article Summary model
-    const article_summary = {
-      author: author[0].toString(),
-      content: article_cid,
-      cover_image,
-      summary: 'Test Demo',
-      title: 'Test Demo'
-    };
+    const article_summary = new ArticleSummary(
+      author, 
+      article_cid, 
+      cover_image, 
+      'Test Demo', 
+      'Test Demo'
+    )
 
     const article_summary_cid = await this.putArticleSummary(article_summary);
 
-    let bucket: Bucket = await this.retrieveLatestBucket(subdomain);
+    let bucket: Bucket = await this.retrieveLatestBucket();
     const [updated_bucket_cid, need_archiving] = await this.addArticleToBucket(
       article_summary_cid,
       bucket
@@ -143,16 +146,43 @@ export class DLog {
       need_archiving
     );
 
-    const content_hash: string = await this.getContent(subdomain);
-    const identity: Identity = await this.retrieveIdentity(content_hash);
+    await this._publish(updated_bucket_cid, need_archiving, options);
+  }
 
-    identity.updateBucket(updated_bucket_cid, need_archiving);
+  public async removeArticle(article_summary_cid: IPFSPath, options: object) {
+    if(!this.subdomain) throw new Error("We couldn't find your account.");
+    let bucket: Bucket = await this.retrieveLatestBucket();
+    const updated_bucket_cid = await this._removeArticle(
+      article_summary_cid,
+      bucket
+    );
+    if (updated_bucket_cid) await this._publish(updated_bucket_cid, false, options);
+  }
 
-    const user_cid: IPFSPath = await this.createIdentity(identity);
-    const result = await this.alpress.methods
-      .publish(subdomain, contentHash.fromIpfs(user_cid.toString()))
-      .send(options);
-    return result;
+  public async replaceArticle(
+    old_article_summary_cid: IPFSPath,
+    new_article: Article,
+    options
+  ) {
+    if(!this.subdomain) throw new Error("We couldn't find your account.");
+    const article_cid: IPFSPath = await this.putArticle(new_article);
+    const { author, cover_image } = new_article;
+    // TO DO think of a way to extract summary, title for Article Summary model
+    const article_summary = new ArticleSummary(
+      author,
+      article_cid,
+      cover_image,
+      'Test Demo', 
+      'Test Demo'
+    )
+    const new_article_summary_cid = await this.putArticleSummary(article_summary);
+    let bucket: Bucket = await this.retrieveLatestBucket();
+    const updated_bucket_cid = await this._replaceArticle(
+      old_article_summary_cid,
+      new_article_summary_cid,
+      bucket
+    );
+    if (updated_bucket_cid) await this._publish(updated_bucket_cid, false, options);
   }
 
   public async addArticleToBucket(
@@ -210,6 +240,101 @@ export class DLog {
     return [updated_bucket_cid, need_archiving];
   }
 
+  /**
+   * removes an article from the dlog.
+   * function uses recursive search to find the bucket that has the article.
+   * it deletes the articles from the bucket,  and updates recursively all the CIDs.
+   * @param  {IPFSPath} article_summary_cid [description]
+   * @param  {Bucket}   bucket              bucket from which function start to look for the article
+   * @return {Promise}                      returns [CID of updated bucket, true] if article was found
+   *                                        or [nul, false] otherwise.
+   */
+  private async _removeArticle(
+    article_summary_cid: IPFSPath,
+    bucket: Bucket
+  ): Promise<IPFSPath | null> {
+    let updated_bucket_cid: IPFSPath | null = null;
+    let bucket_cid_update_needed: boolean = false;
+
+    // search article in bucket
+    let article_index = bucket.searchArticle(article_summary_cid);
+
+    // if found, remove article
+    if (article_index > -1) {
+      bucket.removeArticle(article_index);
+      bucket_cid_update_needed = true;
+
+      // if not found, search recursively in previous bucket
+    } else {
+      let previous_bucket_cid = bucket.getPreviousBucket();
+      if (previous_bucket_cid) {
+        // create a bucket object from previous_bucket_cid
+        let previous: Bucket = await this.getBucket(previous_bucket_cid);
+        let previous_bucket = new Bucket([]);
+        previous_bucket.loadBucket(previous);
+
+        updated_bucket_cid = await this._removeArticle(
+          article_summary_cid,
+          previous_bucket
+        );
+
+        if (updated_bucket_cid) {
+          bucket.setPreviousBucket(updated_bucket_cid);
+          bucket_cid_update_needed = true;
+        }
+      }
+    }
+
+    if (bucket_cid_update_needed)
+      updated_bucket_cid = await this.putBucket(bucket);
+
+    return updated_bucket_cid;
+  }
+
+  private async _replaceArticle(
+    old_article_summary_cid: IPFSPath,
+    new_article_summary_cid: IPFSPath,
+    bucket: Bucket
+  ): Promise<IPFSPath | null> {
+    let updated_bucket_cid: IPFSPath | null = null;
+    let bucket_cid_update_needed: boolean = false;
+
+    // search article in bucket
+    let old_article_index = bucket.searchArticle(old_article_summary_cid);
+
+    // if found, modify article
+    if (old_article_index > -1) {
+      bucket.replaceArticle(old_article_index, new_article_summary_cid);
+      bucket_cid_update_needed = true;
+
+      // if not found, search recursively in previous bucket
+    } else {
+      let previous_bucket_cid = bucket.getPreviousBucket();
+      if (previous_bucket_cid) {
+        // create a bucket object from previous_bucket_cid
+        let previous: Bucket = await this.getBucket(previous_bucket_cid);
+        let previous_bucket = new Bucket([]);
+        previous_bucket.loadBucket(previous);
+
+        updated_bucket_cid = await this._replaceArticle(
+          old_article_summary_cid,
+          new_article_summary_cid,
+          previous_bucket
+        );
+
+        if (updated_bucket_cid) {
+          bucket.setPreviousBucket(updated_bucket_cid);
+          bucket_cid_update_needed = true;
+        }
+      }
+    }
+
+    if (bucket_cid_update_needed)
+      updated_bucket_cid = await this.putBucket(bucket);
+
+    return updated_bucket_cid;
+  }
+
   public async archiving(bucket: Bucket): Promise<Bucket> {
     let previous: Bucket = await this.getBucket(
       bucket.getPreviousBucket() as IPFSPath
@@ -240,6 +365,23 @@ export class DLog {
     return bucket;
   }
 
+  private async _publish(
+    updated_bucket_cid: IPFSPath,
+    need_archiving: boolean = false,
+    options: object
+  ) {
+    const content_hash: string = await this.getContent(this.subdomain);
+    const identity: Identity = await this.retrieveIdentity(content_hash);
+
+    identity.updateBucket(updated_bucket_cid, need_archiving);
+
+    const user_cid: IPFSPath = await this.createIdentity(identity);
+    const result = await this.alpress.methods
+      .publish(this.subdomain, contentHash.fromIpfs(user_cid.toString()))
+      .send(options);
+    return result;
+  }
+
   /**
    *
    * @param content_hash string of CID object
@@ -262,14 +404,14 @@ export class DLog {
   }
 
   /**
-   *
+   * // Legacy code
    * @param content_hash CID object of identity
    */
-  public async pinIdentity(content_hash: IPFSPath): Promise<IPFSPath> {
-    const pinset: Array<{ cid: IPFSPath }> = await this.pin(content_hash);
-    // TO DO error handle
-    return pinset[0].cid.toString('utf-8');
-  }
+  // public async pinIdentity(content_hash: IPFSPath): Promise<IPFSPath> {
+  //   const pinset: Array<{ cid: IPFSPath }> = await this.pin(content_hash);
+  //   // TO DO error handle
+  //   return pinset[0].cid.toString('utf-8');
+  // }
 
   /**
    *
@@ -336,7 +478,14 @@ export class DLog {
     const result = await this.alpress.methods
       .publish(subdomain, contentHash.fromIpfs(user_cid.toString()))
       .send(options);
+    
+    this.setSubdomain()
     return result;
+  }
+
+  public setSubdomain(): void {
+    //TO DO read from chain
+    this.subdomain = "testing"
   }
 
   public async checkTaken(domain: string): Promise<boolean> {
@@ -377,12 +526,16 @@ export class DLog {
     return object_cid;
   }
 
-  private async pin(cid: IPFSPath): Promise<Array<{ cid: IPFSPath }>> {
-    const pinset = await this.node.pin.add(cid.toString(), {
-      recursive: true
-    });
-    return pinset;
-  }
+  /**
+   * //Legacy code
+   * @param cid IPFS content hash
+   */
+  // private async pin(cid: IPFSPath): Promise<Array<{ cid: IPFSPath }>> {
+  //   const pinset = await this.node.pin.add(cid.toString(), {
+  //     recursive: true
+  //   });
+  //   return pinset;
+  // }
 
   private async cp(
     from: IPFSPath | string,
@@ -410,7 +563,7 @@ export class DLog {
   //   return content_hash;
   // }
 
-  public async getContent(subdomain): Promise<string> {
+  public async getContent(subdomain: string): Promise<string> {
     const sub_address = namehash.hash(`${subdomain}.${DLog.ROOT_DOMAIN}`);
     const content = await this.resolver.methods.contenthash(sub_address).call();
     const content_hash = contentHash.decode(this.web3.utils.toAscii(content));
