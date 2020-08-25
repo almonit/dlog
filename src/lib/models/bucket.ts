@@ -52,8 +52,8 @@ export class Bucket implements Bucket {
    * @param {number} index [description]
    */
   public removeArticle(index: number) {
-    if (index < this.articles.length)
-      this.articles.splice(index, 1)
+    if (index < this.article_header_cids.length)
+      this.article_header_cids.splice(index, 1)
     // TODO: else throw error, "index is longer than number of articles"
   }
 
@@ -63,7 +63,7 @@ export class Bucket implements Bucket {
    * @return {number}                       [description]
    */
   public searchArticle(article_summary_cid: IPFSPath): number {
-    return this.articles.findIndex(
+    return this.article_header_cids.findIndex(
       cid => cid.toString() === article_summary_cid.toString()
     );
   }  
@@ -73,8 +73,8 @@ export class Bucket implements Bucket {
    * @param {number} index [description]
    */
   public replaceArticle(index: number, new_article_summary_cid: IPFSPath) {
-    if (index < this.articles.length)
-      this.articles[index] = new_article_summary_cid;
+    if (index < this.article_header_cids.length)
+      this.article_header_cids[index] = new_article_summary_cid;
     // TODO: else throw error, "index is longer than number of articles"
   }
 

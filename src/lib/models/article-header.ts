@@ -1,7 +1,7 @@
 import { Author } from './';
 import { IPFSPath } from 'ipfs/types/interface-ipfs-core/common';
 
-export class ArticleHeader implements ArticleHeader {
+export class ArticleHeader {
   public readonly article_cid: IPFSPath; //IPFSPath of Article object
   public readonly title: string;
   public readonly author: Author;
