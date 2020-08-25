@@ -166,36 +166,36 @@ test('register secondary account', async t => {
 
 test('publish article', async t => {
   const dlog = t.context['dlog'];
-  const { sendOptions } = t.context['ens'];
+  const { secondary_account, sendOptions } = t.context['ens'];
   const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
   const article = new Article(author, "test content", "", []);
-  await dlog.publishArticle(article, sendOptions);
+  await dlog.publishArticle(article, {...sendOptions, from: secondary_account});
   t.pass();
 });
 
 test('edit article', async t => {
   const dlog = t.context['dlog'];
-  const { sendOptions } = t.context['ens'];
+  const { secondary_account, sendOptions } = t.context['ens'];
   const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
 
   const article = new Article(author, "test content", "", []);
-  await dlog.publishArticle(article, sendOptions);
+  await dlog.publishArticle(article, {...sendOptions, from: secondary_account});
   const { articles: article_cids_old } = await dlog.retrieveLatestBucket();
   const article2 = new Article(author, "test content 2", "", []);
   
-  await dlog.replaceArticle(article_cids_old[0], article2, sendOptions);
+  await dlog.replaceArticle(article_cids_old[0], article2, {...sendOptions, from: secondary_account});
   const { articles: article_cids_new } = await dlog.retrieveLatestBucket();
   t.not(article_cids_old[0].toString(), article_cids_new[0].toString());
 });
 
 test('remove article', async t => {
   const dlog = t.context['dlog'];
-  const { sendOptions } = t.context['ens'];
+  const { secondary_account, sendOptions } = t.context['ens'];
   const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
   const article = new Article(author, "test content", "", []);
-  await dlog.publishArticle(article, sendOptions);
+  await dlog.publishArticle(article, {...sendOptions, from: secondary_account});
   const { articles: article_cids_old } = await dlog.retrieveLatestBucket();
-  await dlog.removeArticle(article_cids_old[0], sendOptions);
+  await dlog.removeArticle(article_cids_old[0], {...sendOptions, from: secondary_account});
   const { articles: article_cids_new } = await dlog.retrieveLatestBucket();
   t.assert(article_cids_old.length > article_cids_new.length);
 });
@@ -237,7 +237,7 @@ test('Alpress Contract > registered address buy', async t => {
   const contract = t.context['alpress'];
   const { sendOptions, web3 } = t.context['ens'];
 
-  const promise = contract.methods.buy('something').send({
+  const promise = contract.methods.buy('testing').send({
     ...sendOptions,
     value: web3.utils.toWei('0.005', 'ether')
   });
