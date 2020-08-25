@@ -39,6 +39,7 @@ export default async function localSetup(provider = null): Promise<any> {
   };
   const accounts = await web3.eth.getAccounts();
   const main_account = accounts[0];
+  const secondary_account = accounts[1];
   const empty_account = '0x0000000000000000000000000000000000000000';
   const send_options = {
     gas: 5000000,
@@ -116,6 +117,7 @@ export default async function localSetup(provider = null): Promise<any> {
     contractRegistry,
     ipfs,
     main_account,
+    secondary_account,
     contractResolver,
     send_options,
     web3

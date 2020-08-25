@@ -15,6 +15,7 @@ test.before(async t => {
     contractRegistry,
     ipfs,
     main_account,
+    secondary_account,
     contractResolver,
     send_options,
     web3
@@ -23,6 +24,7 @@ test.before(async t => {
   t.context['ens'] = {
     address: address,
     account: main_account,
+    secondary_account: secondary_account,
     registry: contractRegistry.methods,
     resolver: contractResolver.methods,
     sendOptions: send_options,
@@ -150,13 +152,13 @@ test('put/get identity', async t => {
   t.is(JSON.stringify(identity), JSON.stringify(result_identity));
 });
 
-test('register', async t => {
+test('register secondary account', async t => {
   const dlog = t.context['dlog'];
-  const { sendOptions } = t.context['ens'];
+  const { secondary_account, sendOptions } = t.context['ens'];
   const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
   const author_cid = await dlog.putAuthor(author);
   const identity = new Identity(author_cid);
-  await dlog.register('testing', identity, sendOptions);
+  await dlog.register('testing', identity, {...sendOptions, from: secondary_account});
   const content_hash = await dlog.getContent('testing');
   const retrieved_identity = await dlog.retrieveIdentity(content_hash);
   t.is(retrieved_identity.author.toString(), identity.author.toString());
@@ -229,6 +231,24 @@ test('Alpress Contract > buy', async t => {
     value: web3.utils.toWei('0.005', 'ether')
   });
   t.pass();
+});
+
+test('Alpress Contract > registered address buy', async t => {
+  const contract = t.context['alpress'];
+  const { sendOptions, web3 } = t.context['ens'];
+
+  const promise = contract.methods.buy('something').send({
+    ...sendOptions,
+    value: web3.utils.toWei('0.005', 'ether')
+  });
+  await t.throwsAsync(promise);
+});
+
+test('Alpress Contract > registered address query', async t => {
+  const contract = t.context['alpress'];
+
+  const result = await contract.methods.getName().call();
+  t.is(result, 'mdt');
 });
 
 test('Alpress Contract > allocated address', async t => {
