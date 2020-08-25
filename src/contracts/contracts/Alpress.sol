@@ -32,6 +32,7 @@ contract Alpress {
         uint256 expirationBlock;
     }
 
+    mapping(address => bytes32) holders;
     mapping(bytes32 => Blog) blogs;
 
     constructor(ENS _ens, AlpressResolver _resolver) public {
@@ -47,9 +48,10 @@ contract Alpress {
         require(
             ((ens.owner(keccak256(abi.encodePacked(platformNode, label))) ==
                 address(0)) || (blogs[label].owner == address(0))),
-            'User already registered'
+            'Subdomain is already taken'
         );
-
+        // User must not have more than one account
+        require(holders[msg.sender] == 0, "User already has an account");
         // User must have paid enough
         require(msg.value >= rentPricePerYear, 'Not enough amount');
 
@@ -67,6 +69,7 @@ contract Alpress {
 
         //register for one year "approximately" (assuming accurate block time disregarding leap years)
         blogs[label].expirationBlock = now + 365 days;
+        holders[msg.sender] = label;
 
         emit NewRegistration(label, name);
     }
@@ -121,6 +124,7 @@ contract Alpress {
 
         // Delete blog from this contract mapping
         delete blogs[label];
+        delete holders[msg.sender];
     }
 
     function doRegistration(bytes32 label) internal {
@@ -182,6 +186,14 @@ contract Alpress {
             (blogs[label].owner != address(0)) &&
             (blogs[label].expirationBlock > now)
         ) taken = true;
+    }
+
+    function getName() external view returns (string memory name) {
+        bytes32 label = holders[msg.sender];
+        if(label != 0) {
+            return blogs[label].name;
+        }
+        return "";
     }
 
     function getOwner(string calldata name)

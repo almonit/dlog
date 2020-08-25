@@ -15,6 +15,7 @@ test.before(async t => {
     contractRegistry,
     ipfs,
     main_account,
+    secondary_account,
     contractResolver,
     send_options,
     web3
@@ -23,6 +24,7 @@ test.before(async t => {
   t.context['ens'] = {
     address: address,
     account: main_account,
+    secondary_account: secondary_account,
     registry: contractRegistry.methods,
     resolver: contractResolver.methods,
     sendOptions: send_options,
@@ -149,22 +151,57 @@ test('put/get identity', async t => {
   const identity = new Identity(author_cid);
   const identity_cid = await dlog.createIdentity(identity);
   // const pinned_cid = await dlog.pinIdentity(identity_cid);
-  console.log("HERE1");
   const result_identity = await dlog.retrieveIdentity(identity_cid);
-  console.log("HERE2");
   t.is(JSON.stringify(identity), JSON.stringify(result_identity));
 });
 
-test('register', async t => {
+test('register secondary account', async t => {
   const dlog = t.context['dlog'];
-  const { sendOptions } = t.context['ens'];
+  const { secondary_account, sendOptions } = t.context['ens'];
   const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
   const author_cid = await dlog.putAuthor(author);
   const identity = new Identity(author_cid);
-  await dlog.register('testing', identity, sendOptions);
+  await dlog.register('testing', identity, {...sendOptions, from: secondary_account});
   const content_hash = await dlog.getContenthash('testing');
   const retrieved_identity = await dlog.retrieveIdentity(content_hash);
   t.is(retrieved_identity.author_cid.toString(), identity.author_cid.toString());
+});
+
+test('publish article', async t => {
+  const dlog = t.context['dlog'];
+  const { secondary_account, sendOptions } = t.context['ens'];
+  const article = new Article("test content");
+  const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
+  await dlog.publishArticle(article, author, "", {...sendOptions, from: secondary_account});
+  t.pass();
+});
+
+test('edit article', async t => {
+  const dlog = t.context['dlog'];
+  const { secondary_account, sendOptions } = t.context['ens'];
+
+  const article = new Article("test content");
+  const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
+  await dlog.publishArticle(article, author, "", {...sendOptions, from: secondary_account});
+  const { article_header_cids: article_cids_old } = await dlog.retrieveLatestBucket();
+  const article2 = new Article("test content 2");
+  
+  await dlog.replaceArticle(article_cids_old[0], article2, author, "", {...sendOptions, from: secondary_account});
+  const { article_header_cids: article_cids_new } = await dlog.retrieveLatestBucket();
+  t.not(article_cids_old[0].toString(), article_cids_new[0].toString());
+});
+
+test('remove article', async t => {
+  const dlog = t.context['dlog'];
+  const { secondary_account, sendOptions } = t.context['ens'];
+  const article = new Article("test content");
+  const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
+  await dlog.publishArticle(article, author, "", {...sendOptions, from: secondary_account});
+  const { article_header_cids: article_cids_old } = await dlog.retrieveLatestBucket();
+  
+  await dlog.removeArticle(article_cids_old[0], {...sendOptions, from: secondary_account});
+  const { article_header_cids: article_cids_new } = await dlog.retrieveLatestBucket();
+  t.assert(article_cids_old.length > article_cids_new.length);
 });
 
 test('Alpress Contract > non-allocated address', async t => {
@@ -198,6 +235,24 @@ test('Alpress Contract > buy', async t => {
     value: web3.utils.toWei('0.005', 'ether')
   });
   t.pass();
+});
+
+test('Alpress Contract > registered address buy', async t => {
+  const contract = t.context['alpress'];
+  const { sendOptions, web3 } = t.context['ens'];
+
+  const promise = contract.methods.buy('testing').send({
+    ...sendOptions,
+    value: web3.utils.toWei('0.005', 'ether')
+  });
+  await t.throwsAsync(promise);
+});
+
+test('Alpress Contract > registered address query', async t => {
+  const contract = t.context['alpress'];
+
+  const result = await contract.methods.getName().call();
+  t.is(result, 'mdt');
 });
 
 test('Alpress Contract > allocated address', async t => {
