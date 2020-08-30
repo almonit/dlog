@@ -485,13 +485,15 @@ export class DLog {
       .publish(subdomain, contentHash.fromIpfs(user_cid.toString()))
       .send(options);
     
-    this.setSubdomain()
+    await this.setSubdomain(options)
     return result;
   }
 
-  public setSubdomain(): void {
-    //TO DO read from chain
-    this.subdomain = "testing"
+  public async setSubdomain(options): Promise<void> {
+    const result = await this.alpress.methods
+      .getName()
+      .call(options);
+    this.subdomain = result
   }
 
   public async checkTaken(domain: string): Promise<boolean> {
