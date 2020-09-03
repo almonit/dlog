@@ -1,8 +1,8 @@
 import { Article } from './article';
-import { ArticleSummary } from './article-summary';
+import { ArticleHeader } from './article-header';
 import { Author } from './author';
 import { Bucket } from './bucket';
 import { ENSContent } from './ens-content';
 import { Identity } from './identity';
 
-export { Article, ArticleSummary, Author, Bucket, ENSContent, Identity };
+export { Article, ArticleHeader, Author, Bucket, ENSContent, Identity };

@@ -25,6 +25,21 @@ export default async function localSetup(provider = null): Promise<any> {
     // 'https://:62ff7188c74447b6a67afbc2de247610@ropsten.infura.io/v3/372375d582d843c48a4eaee6aa5c1b3a'
   );
 
+    const config = await deploy(
+      web3
+    );
+
+  return {
+    ...config,
+    ipfs,
+    web3
+  };
+}
+
+async function deploy(
+  web3,
+) {
+
   // const address_label = getNameHashSHA3(web3, 'alpress').sha3;
   const address_label =
     '0xefa02a3c3d5ae7bcd3eb19a279dee2d2584e97a31cb9a3d54eed0182bd398d80';
@@ -46,7 +61,7 @@ export default async function localSetup(provider = null): Promise<any> {
     gasPrice: '3000000',
     from: main_account
   };
-
+  
   const instanceRegistry = new web3.eth.Contract(ENSRegistry.abi);
   const contractRegistry = await instanceRegistry
     .deploy({
@@ -115,12 +130,10 @@ export default async function localSetup(provider = null): Promise<any> {
     address,
     contractAlpressRegistrar,
     contractRegistry,
-    ipfs,
+    contractResolver,
     main_account,
     secondary_account,
-    contractResolver,
-    send_options,
-    web3
+    send_options
   };
 }
 

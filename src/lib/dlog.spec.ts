@@ -5,7 +5,7 @@ import test from 'ava';
 import contentHash from 'content-hash';
 
 import { DLog } from './dlog';
-import { Article, ArticleSummary, Author, Bucket, Identity } from './models';
+import { Article, ArticleHeader, Author, Bucket, Identity } from './models';
 import localSetup, { timeTravel } from './utils/local-setup';
 
 test.before(async t => {
@@ -56,29 +56,29 @@ test('put/get author', async t => {
 
 test('put/get article', async t => {
   const dlog = t.context['dlog'];
-  const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
-  const article = new Article(author, 'Test', 'base64_img', []);
+  const article = new Article('Test');
   const cid_article = await dlog.putArticle(article);
-  const result_article = await dlog.getArticle(cid_article.toString());
-  t.is(result_article.content, article.content);
+  const result_article : Article = await dlog.getArticle(cid_article.toString());
+  t.is(result_article.serializedArticle, article.serializedArticle);
 });
 
-test('put/get article summary', async t => {
+test('put/get article header', async t => {
   const dlog = t.context['dlog'];
   const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
-  const article = new Article(author, 'Test', 'base64_img', []);
-  const cid_article = await dlog.putArticle(article);
+  const article = new Article('Test');
+  const article_cid = await dlog.putArticle(article);
 
-  const article_summary = new ArticleSummary(
+  const article_header = new ArticleHeader(
+    article_cid,
+    "Test title",
     author,
-    cid_article,
     'base64_img',
     'Test',
-    'First Title'
+    []
   );
-  const cid_AS = await dlog.putArticleSummary(article_summary);
-  const result_aso = await dlog.getArticleSummary(cid_AS.toString());
-  t.is(result_aso.title, article_summary.title);
+  const article_header_cid = await dlog.putArticleHeader(article_header);
+  const result_article_header = await dlog.getArticleHeader(article_header_cid.toString());
+  t.is(result_article_header.title, article_header.title);
 });
 
 test('test archiving', async t => {
@@ -86,25 +86,27 @@ test('test archiving', async t => {
   const dlog = t.context['dlog'];
   const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
 
-  const article = new Article(author, 'Test', 'base64_img', []);
-  const cid_article = await dlog.putArticle(article);
+  const article = new Article('Test');
+  const article_cid = await dlog.putArticle(article);
 
-  const article_summary = new ArticleSummary(
+  const article_header = new ArticleHeader(
+    article_cid,
+    "Test title",
     author,
-    cid_article,
     'base64_img',
     'Test',
-    'First Title'
+    []
   );
-  const cid_AS = await dlog.putArticleSummary(article_summary);
+
+  const article_header_cid = await dlog.putArticleHeader(article_header);
 
   const bucket = new Bucket([]);
   bucket.setIndex(1);
 
   // push many articles to test archiving
   for (let i = 1; i <= ARTICLES_TO_PUSH; i++) {
-    var [new_bucket_cid, archiving] = await dlog.addArticleToBucket(
-      cid_AS,
+    var [new_bucket_cid, archiving] = await dlog.addArticleHeaderCIDToBucket(
+      article_header_cid,
       bucket
     );
     let temp_bucket = (await dlog.getBucket(
@@ -120,25 +122,26 @@ test('test archiving', async t => {
 test('put/get bucket', async t => {
   const dlog = t.context['dlog'];
   const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
-  const article = new Article(author, 'Test', 'base64_img', []);
-  const cid_article = await dlog.putArticle(article);
+  const article = new Article('Test');
+  const article_cid = await dlog.putArticle(article);
 
-  const article_summary = new ArticleSummary(
+  const article_header = new ArticleHeader(
+    article_cid,
+    "Test title",
     author,
-    cid_article,
     'base64_img',
     'Test',
-    'First Title'
+    []
   );
-  const cid_AS = await dlog.putArticleSummary(article_summary);
+  const article_header_cid = await dlog.putArticleHeader(article_header);
 
   const bucket = new Bucket([]);
-  bucket.addArticle(cid_AS);
+  bucket.addArticleHeaderCID(article_header_cid);
   const cid_bucket = await dlog.putBucket(bucket);
   let result_bucket = new Bucket([]);
   let temp_bucket = (await dlog.getBucket(cid_bucket.toString())) as Bucket;
   result_bucket.loadBucket(temp_bucket);
-  t.deepEqual(result_bucket.getArticle(0), bucket.getArticle(0));
+  t.deepEqual(result_bucket.getArticleHeaderCID(0), bucket.getArticleHeaderCID(0));
 });
 
 test('put/get identity', async t => {
@@ -159,44 +162,45 @@ test('register secondary account', async t => {
   const author_cid = await dlog.putAuthor(author);
   const identity = new Identity(author_cid);
   await dlog.register('testing', identity, {...sendOptions, from: secondary_account});
-  const content_hash = await dlog.getContent('testing');
+  const content_hash = await dlog.getContenthash('testing');
   const retrieved_identity = await dlog.retrieveIdentity(content_hash);
-  t.is(retrieved_identity.author.toString(), identity.author.toString());
+  t.is(retrieved_identity.author_cid.toString(), identity.author_cid.toString());
 });
 
 test('publish article', async t => {
   const dlog = t.context['dlog'];
   const { secondary_account, sendOptions } = t.context['ens'];
+  const article = new Article("test content");
   const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
-  const article = new Article(author, "test content", "", []);
-  await dlog.publishArticle(article, {...sendOptions, from: secondary_account});
+  await dlog.publishArticle(article, author, "", {...sendOptions, from: secondary_account});
   t.pass();
 });
 
 test('edit article', async t => {
   const dlog = t.context['dlog'];
   const { secondary_account, sendOptions } = t.context['ens'];
-  const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
 
-  const article = new Article(author, "test content", "", []);
-  await dlog.publishArticle(article, {...sendOptions, from: secondary_account});
-  const { articles: article_cids_old } = await dlog.retrieveLatestBucket();
-  const article2 = new Article(author, "test content 2", "", []);
+  const article = new Article("test content");
+  const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
+  await dlog.publishArticle(article, author, "", {...sendOptions, from: secondary_account});
+  const { article_header_cids: article_cids_old } = await dlog.retrieveLatestBucket();
+  const article2 = new Article("test content 2");
   
-  await dlog.replaceArticle(article_cids_old[0], article2, {...sendOptions, from: secondary_account});
-  const { articles: article_cids_new } = await dlog.retrieveLatestBucket();
+  await dlog.replaceArticle(article_cids_old[0], article2, author, "", {...sendOptions, from: secondary_account});
+  const { article_header_cids: article_cids_new } = await dlog.retrieveLatestBucket();
   t.not(article_cids_old[0].toString(), article_cids_new[0].toString());
 });
 
 test('remove article', async t => {
   const dlog = t.context['dlog'];
   const { secondary_account, sendOptions } = t.context['ens'];
+  const article = new Article("test content");
   const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
-  const article = new Article(author, "test content", "", []);
-  await dlog.publishArticle(article, {...sendOptions, from: secondary_account});
-  const { articles: article_cids_old } = await dlog.retrieveLatestBucket();
+  await dlog.publishArticle(article, author, "", {...sendOptions, from: secondary_account});
+  const { article_header_cids: article_cids_old } = await dlog.retrieveLatestBucket();
+  
   await dlog.removeArticle(article_cids_old[0], {...sendOptions, from: secondary_account});
-  const { articles: article_cids_new } = await dlog.retrieveLatestBucket();
+  const { article_header_cids: article_cids_new } = await dlog.retrieveLatestBucket();
   t.assert(article_cids_old.length > article_cids_new.length);
 });
 
@@ -217,9 +221,9 @@ test('Alpress Contract > non-allocated expiration', async t => {
 
   await contract.methods.getExpiration('mdt').call();
 
-  const expirationResult = await contract.methods.getExpiration('mdt').call();
+  const expiration_result = await contract.methods.getExpiration('mdt').call();
 
-  t.is(expirationResult, '0');
+  t.is(expiration_result, '0');
 });
 
 test('Alpress Contract > buy', async t => {

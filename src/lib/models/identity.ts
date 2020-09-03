@@ -1,33 +1,34 @@
 import { IPFSPath } from 'ipfs/types/interface-ipfs-core/common';
 
 export class Identity implements Identity {
-  public readonly author: IPFSPath;
-  private buckets: IPFSPath[];
+  public readonly author_cid: IPFSPath;
+  private bucket_cids: IPFSPath[];
+  private static LIVE_BUCKETS_NUMBER = 3;
 
-  constructor(author: IPFSPath, buckets: IPFSPath[] = []) {
-    this.author = author;
-    this.buckets = buckets;
+  constructor(author_cid: IPFSPath, bucket_cids: IPFSPath[] = []) {
+    this.author_cid = author_cid;
+    this.bucket_cids = bucket_cids;
   }
 
   public getBucketCID(index: number): IPFSPath {
-    return this.buckets[index];
+    return this.bucket_cids[index];
   }
 
   public asBuffer(): Buffer {
     const identity = {
-      author: this.author,
-      buckets: this.buckets
+      author_cid: this.author_cid,
+      bucket_cids: this.bucket_cids
     };
     return Buffer.from(JSON.stringify(identity));
   }
 
-  public updateBucket(bucket_cid: IPFSPath, need_archiving: boolean): void {
+  public updateBucketCID(bucket_cid: IPFSPath, need_archiving: boolean): void {
     //TODO update this as it needs to store 3 buckets at a time
     if (need_archiving) {
-      this.buckets.unshift(bucket_cid);
-      this.buckets.length = 3;
+      this.bucket_cids.unshift(bucket_cid);
+      this.bucket_cids.length = Identity.LIVE_BUCKETS_NUMBER;
     } else {
-      this.buckets[0] = bucket_cid;
+      this.bucket_cids[0] = bucket_cid;
     }
   }
 }
