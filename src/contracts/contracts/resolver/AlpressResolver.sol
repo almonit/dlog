@@ -27,6 +27,7 @@ contract AlpressResolver is
 {
     ENS ens;
     address alpress;
+    address private almonit;
 
     /**
      * A mapping of authorisations. An address that is authorised for a name
@@ -44,9 +45,15 @@ contract AlpressResolver is
         bool isAuthorised
     );
 
+    modifier almonit_only {
+        require(msg.sender == almonit, 'Access denied');
+        _;
+    }
+
     constructor(ENS _ens, address _alpress) public {
         ens = _ens;
         alpress = _alpress;
+        almonit = msg.sender;
     }
 
     /**
@@ -57,8 +64,8 @@ contract AlpressResolver is
      * an ownership transfer if desired.
      *
      */
-    function setAlpress(address _alpress) external {
-        if (msg.sender == alpress) alpress = _alpress;
+    function setAlpress(address _alpress) public almonit_only {
+        alpress = _alpress;
     }
 
     function isAuthorised(bytes32 node) internal override view returns (bool) {

@@ -355,7 +355,7 @@ test('Alpress Contract > publish', async t => {
   await contract.methods
     .publish(
       'mdt',
-      contentHash.fromIpfs('QmVNJbmxqpCj2kKB8ddtAweKU1dWeNisymCdNiYw6wokyz')
+      `0x${contentHash.fromIpfs('QmVNJbmxqpCj2kKB8ddtAweKU1dWeNisymCdNiYw6wokyz')}`
     )
     .send(sendOptions);
   t.pass();

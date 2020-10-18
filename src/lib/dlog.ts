@@ -15,19 +15,21 @@ import loadJSON from './utils/load-json';
 export class DLog {
   public static readonly ROOT_DOMAIN: string = 'alpress.eth';
   public static readonly AUTHOR_PAGE: string =
-    '/ipfs/QmamDJKm5DtpxtHdF8raZm4Nz7QV19WQSyP64sdUQKDFfi';
+    '/ipfs/QmYfDUEu64Px9GcmaP4LhuD4DJJ2ycos8WqWcyKMyp4FWL';
   public static readonly IDENTITY_FILE: string = 'identity.json';
   public static readonly INDEX_FILE: string = 'index.html';
 
   public alpress;
   public resolver;
   private session: Session = new Session();
+  private swarm_topic: string = "AlpressTestnet";
 
   constructor(
     public node: IPFS,
     public web3: Web3 | any = null,
     alpress_address: string,
-    alpress_resolver_address: string
+    alpress_resolver_address: string,
+    swarm_topic?: string
   ) {
     this.node = node;
     this.web3 = web3;
@@ -36,6 +38,7 @@ export class DLog {
       AlpressResolver.abi,
       alpress_resolver_address
     );
+    if(swarm_topic) this.swarm_topic = swarm_topic;
   }
 
   /* Public methods */
@@ -395,14 +398,16 @@ export class DLog {
     identity.updateBucketCID(updated_bucket_cid, need_archiving);
 
     const user_cid: IPFSPath = await this.createIdentity(identity);
+    const msg = new TextEncoder().encode(`${subdomain} ${user_cid.toString()}\n`)
+    await this.node.pubsub.publish(this.swarm_topic, msg)
     const result = await this.alpress.methods
-      .publish(subdomain, contentHash.fromIpfs(user_cid.toString()))
+      .publish(subdomain, this.encodeCID(user_cid.toString()))
       .send(options);
     return result;
   }
 
   public async retrieveContentFromFile(): Promise<Bucket> {
-    const result = await loadJSON(`/static/${DLog.IDENTITY_FILE}`);
+    const result = await loadJSON(`./static/${DLog.IDENTITY_FILE}`);
     const identity = new Identity(
       new CIDs(
         1,
@@ -439,7 +444,7 @@ export class DLog {
      * @see https://github.com/ipfs/js-ipfs/blob/master/docs/core-api/OBJECT.md#ipfsobjectgetcid-options
      */
     const identity_data = await this.getFiles(
-      this.pathJoin([content_hash, DLog.IDENTITY_FILE])
+      this.pathJoin([content_hash, '/static', DLog.IDENTITY_FILE])
     );
     const { author_cid, bucket_cids } = JSON.parse(identity_data[0].toString());
     const identity = new Identity(
@@ -469,24 +474,16 @@ export class DLog {
      * @see https://github.com/ipfs/js-ipfs/blob/master/docs/core-api/FILES.md#ipfsadddata-options
      * @see https://github.com/ipfs/js-ipfs/blob/master/docs/core-api/FILES.md#ipfsfilescpfrom-to-options
      */
-    // await this.node.files.rm('/stuff', { recursive: true });
-    await this.node.files.mkdir('/stuff', {
+    // await this.node.files.rm('/dlog', { recursive: true });
+    await this.node.files.mkdir('/dlog', {
       parents: true,
       format: 'dag-pb',
       hashAlg: 'sha2-256',
       flush: true
     });
-    await this.node.files.write(
-      this.pathJoin(['/stuff', DLog.IDENTITY_FILE]),
-      identity.asBuffer(),
-      {
-        create: true,
-        truncate: true
-      }
-    );
     await this.cp(
       DLog.AUTHOR_PAGE,
-      this.pathJoin(['/stuff', DLog.INDEX_FILE]),
+      this.pathJoin(['/dlog', '/alpress']),
       {
         parents: true,
         format: 'dag-pb',
@@ -495,9 +492,17 @@ export class DLog {
         timeout: 5000
       }
     );
-    const { cid }: { cid: IPFSPath } = await this.node.files.stat('/stuff');
-    // const directory_contents = await all(this.node.files.ls('/stuff'))
-    // const read_chunks = this.node.files.read('/stuff/index.html', {});
+    await this.node.files.write(
+      this.pathJoin(['/dlog', '/alpress', '/static', DLog.IDENTITY_FILE]),
+      identity.asBuffer(),
+      {
+        create: true,
+        truncate: true
+      }
+    );
+    const { cid }: { cid: IPFSPath } = await this.node.files.stat('/dlog/alpress');
+    // const directory_contents = await all(this.node.files.ls('/dlog'))
+    // const read_chunks = this.node.files.read('/dlog/index.html', {});
     // const read_content = await this.fromBuffer(read_chunks);
     // console.log('read_content', read_content.toString());
     // console.info('directory_contents', directory_contents)
@@ -522,7 +527,7 @@ export class DLog {
       value: this.web3.utils.toWei('0.005', 'ether')
     });
     const result = await this.alpress.methods
-      .publish(subdomain, contentHash.fromIpfs(user_cid.toString()))
+      .publish(subdomain, this.encodeCID(user_cid.toString()))
       .send(options);
 
     await this.setSubdomain(options);
@@ -602,7 +607,7 @@ export class DLog {
   private async cp(
     from: IPFSPath | string,
     to: string,
-    options: object = {}
+    options: object = { parents: true, recursive: true }
   ): Promise<void> {
     try {
       await this.node.files.cp(from, to, options);
@@ -613,7 +618,7 @@ export class DLog {
       for await (const file of this.node.get(from)) {
         if (!file.content) continue;
         const cp_content = await this.fromBuffer(file.content);
-        await this.node.files.write(to, cp_content, { create: true });
+        await this.node.files.write(this.pathJoin([to, file['name']]), cp_content, { create: true });
       }
     }
   }
@@ -628,7 +633,7 @@ export class DLog {
   public async getContenthash(subdomain: string): Promise<string> {
     const sub_address = namehash.hash(`${subdomain}.${DLog.ROOT_DOMAIN}`);
     const content = await this.resolver.methods.contenthash(sub_address).call();
-    const content_hash = contentHash.decode(this.web3.utils.toAscii(content));
+    const content_hash = contentHash.decode(content);
     return content_hash;
   }
 
@@ -652,6 +657,10 @@ export class DLog {
   private pathJoin(parts: String[], separator: string = '/') {
     const replace = new RegExp(separator + '{1,}', 'g');
     return parts.join(separator).replace(replace, separator);
+  }
+
+  private encodeCID(cid: string): string {
+    return `0x${contentHash.fromIpfs(cid)}`
   }
 
   // private getBytes32FromIpfsHash(hash: string): string {
