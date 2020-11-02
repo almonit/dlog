@@ -14,8 +14,16 @@ import loadJSON from './utils/load-json';
 
 export class DLog {
   public static readonly ROOT_DOMAIN: string = 'alpress.eth';
+
+  // // EMPTY ALPRESS
   public static readonly AUTHOR_PAGE: string =
-    '/ipfs/QmYfDUEu64Px9GcmaP4LhuD4DJJ2ycos8WqWcyKMyp4FWL';
+    '/ipfs/QmVpwgXnqdQLVM3QU9HYthRUicVa3V5FxDEf4XcH6rN3XG';
+
+  // Cryptoanachist manifests
+  // public static readonly AUTHOR_PAGE: string =
+  //   '/ipfs/QmZjNmDspDCuw9bkgFQcwsoKuxHKzifqq7yTEEyQdeHCXp';
+
+
   public static readonly IDENTITY_FILE: string = 'identity.json';
   public static readonly INDEX_FILE: string = 'index.html';
 
@@ -42,7 +50,6 @@ export class DLog {
   }
 
   /* Public methods */
-
   public async getAuthor(cid: IPFSPath): Promise<Author> {
     const { value }: { value: Author } = (await this.get(cid)) as any;
     return value;
@@ -455,35 +462,21 @@ export class DLog {
   }
 
   /**
-   * // Legacy code
-   * @param content_hash CID object of identity
-   */
-  // public async pinIdentity(content_hash: IPFSPath): Promise<IPFSPath> {
-  //   const pinset: Array<{ cid: IPFSPath }> = await this.pin(content_hash);
-  //   // TO DO error handle
-  //   return pinset[0].cid.toString('utf-8');
-  // }
-
-  /**
    *
    * @param identity [User identity model, has Author CID and list of CID of most recent 3 bucket]
+   * @description create a CID for  author identity with empty alpress 
+   * @see https://github.com/ipfs/js-ipfs/blob/master/docs/core-api/FILES.md#ipfsadddata-options
+   * @see https://github.com/ipfs/js-ipfs/blob/master/docs/core-api/FILES.md#ipfsfilescpfrom-to-options
    */
   public async createIdentity(identity: Identity): Promise<IPFSPath> {
-    /**
-     * look for writing identity + main page CID
-     * @see https://github.com/ipfs/js-ipfs/blob/master/docs/core-api/FILES.md#ipfsadddata-options
-     * @see https://github.com/ipfs/js-ipfs/blob/master/docs/core-api/FILES.md#ipfsfilescpfrom-to-options
-     */
-    // await this.node.files.rm('/dlog', { recursive: true });
-    await this.node.files.mkdir('/dlog', {
-      parents: true,
-      format: 'dag-pb',
-      hashAlg: 'sha2-256',
-      flush: true
-    });
+
+    // clear any existing Alprses folder
+    await this.rm('/alpress', { recursive: true })
+
+    // copy empty Alpress into the alpress folder
     await this.cp(
       DLog.AUTHOR_PAGE,
-      this.pathJoin(['/dlog', '/alpress']),
+      '/alpress',
       {
         parents: true,
         format: 'dag-pb',
@@ -492,20 +485,19 @@ export class DLog {
         timeout: 5000
       }
     );
+
+    // copy the author identity file into /alpress/static folder
     await this.node.files.write(
-      this.pathJoin(['/dlog', '/alpress', '/static', DLog.IDENTITY_FILE]),
+      this.pathJoin(['/alpress', '/static', DLog.IDENTITY_FILE]),
       identity.asBuffer(),
       {
         create: true,
         truncate: true
       }
     );
-    const { cid }: { cid: IPFSPath } = await this.node.files.stat('/dlog/alpress');
-    // const directory_contents = await all(this.node.files.ls('/dlog'))
-    // const read_chunks = this.node.files.read('/dlog/index.html', {});
-    // const read_content = await this.fromBuffer(read_chunks);
-    // console.log('read_content', read_content.toString());
-    // console.info('directory_contents', directory_contents)
+    
+    const { cid }: { cid: IPFSPath } = await this.node.files.stat('/alpress');
+    
     return cid;
   }
 
@@ -522,10 +514,13 @@ export class DLog {
   ): Promise<string> {
     const _identity = new Identity(identity.author_cid);
     const user_cid = await this.createIdentity(_identity);
+    console.log("DEBUG user_cid: ", user_cid);
+    
     await this.alpress.methods.buy(subdomain).send({
       ...options,
       value: this.web3.utils.toWei('0.005', 'ether')
     });
+
     const result = await this.alpress.methods
       .publish(subdomain, this.encodeCID(user_cid.toString()))
       .send(options);
@@ -593,17 +588,7 @@ export class DLog {
     return object_cid;
   }
 
-  /**
-   * //Legacy code
-   * @param cid IPFS content hash
-   */
-  // private async pin(cid: IPFSPath): Promise<Array<{ cid: IPFSPath }>> {
-  //   const pinset = await this.node.pin.add(cid.toString(), {
-  //     recursive: true
-  //   });
-  //   return pinset;
-  // }
-
+  // ipfs cp function with added error handling
   private async cp(
     from: IPFSPath | string,
     to: string,
@@ -613,6 +598,7 @@ export class DLog {
       await this.node.files.cp(from, to, options);
     } catch (error) {
       console.warn('IPFS.Files.CP', error.code, from);
+      console.log("error caught: ", error);
       if (error.code == 'ERR_ALREADY_EXISTS') return;
 
       for await (const file of this.node.get(from)) {
@@ -620,6 +606,21 @@ export class DLog {
         const cp_content = await this.fromBuffer(file.content);
         await this.node.files.write(this.pathJoin([to, file['name']]), cp_content, { create: true });
       }
+    }
+  }
+
+  // ipfs rm function with added error handling
+  private async rm(
+    path: string,
+    options: object = { parents: true, recursive: true }
+  ): Promise<void> {
+    try {
+      await this.node.files.rm(path, options);
+    } catch (error) {
+      if (error.code == 'ERR_NOT_FOUND') 
+        return
+      else
+        console.log(error);
     }
   }
 

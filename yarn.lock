@@ -13701,3 +13701,4 @@ zcash-block@^2.0.0:
   integrity sha512-I6pv5b+eGE8CJFmltR+ILHnGcnBO8olV78VicQIaWulMhkomlwDmaMeMshJRLPcnd0FBs58QQVcVNBOT9ojH6Q==
   dependencies:
     multihashing "~0.3.3"
+
