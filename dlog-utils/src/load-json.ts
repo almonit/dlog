@@ -1,4 +1,4 @@
-export default function loadJSON(url: string): Promise<any> {
+export function loadJSON(url: string): Promise<any> {
   return new Promise(function(resolve, reject) {
     fetch(url)
       .then(function(response) {

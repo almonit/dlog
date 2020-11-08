@@ -4,11 +4,11 @@ import Web3 from 'web3';
 import { AbstractProvider } from 'web3-core/types';
 
 // import getNameHashSHA3 from './hash';
-import { AlpressResolver, AlpressRegistrar } from '../../contracts';
+import { AlpressResolver, AlpressRegistrar } from 'alpress-contracts';
 
 const ganache = require('ganache-core');
 
-export default async function localSetup(provider = null): Promise<any> {
+export async function localSetup(provider = null): Promise<any> {
   const repoPath = 'repo/ipfs-' + Math.random();
   const ipfs = await IPFS.create({ repo: repoPath });
   await ipfs.bootstrap.add(

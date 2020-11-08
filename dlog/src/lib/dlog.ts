@@ -6,18 +6,18 @@ import IPFS from 'ipfs';
 import { IPFSPath } from 'ipfs/types/interface-ipfs-core/common';
 import namehash from 'eth-ens-namehash';
 import Web3 from 'web3';
-import { AlpressRegistrar, AlpressResolver } from '../contracts';
+import { AlpressRegistrar, AlpressResolver } from 'alpress-contracts';
 
 import { Article, ArticleHeader, Author, Bucket, Identity } from './models';
 import { Session } from './models/session';
-import loadJSON from './utils/load-json';
+import {loadJSON} from 'dlog-utils';
 
 export class DLog {
   public static readonly ROOT_DOMAIN: string = 'alpress.eth';
 
   // // EMPTY ALPRESS
   public static readonly AUTHOR_PAGE: string =
-    '/ipfs/QmVpwgXnqdQLVM3QU9HYthRUicVa3V5FxDEf4XcH6rN3XG';
+    '/ipfs/QmcsxcjVDtETYAa7u5UnfukGbP5YKLuoajxLsMRR9Lw7NH';
 
   // Cryptoanachist manifests
   // public static readonly AUTHOR_PAGE: string =
@@ -693,5 +693,3 @@ export class DLog {
     };
   }
 }
-
-export * from './utils';

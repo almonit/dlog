@@ -6,7 +6,7 @@ import contentHash from 'content-hash';
 
 import { DLog } from './dlog';
 import { Article, ArticleHeader, Author, Bucket, Identity } from './models';
-import localSetup, { timeTravel } from './utils/local-setup';
+import {localSetup, timeTravel } from 'dlog-utils';
 
 test.before(async t => {
   const {
