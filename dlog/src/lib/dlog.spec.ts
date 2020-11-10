@@ -278,14 +278,42 @@ test('Alpress Contract > non-allocated expiration', async t => {
   t.is(expiration_result, '0');
 });
 
-test('Alpress Contract > buy', async t => {
+// test('Alpress Contract > buy', async t => {
+//   const contract = t.context['alpress'];
+//   const { sendOptions, web3 } = t.context['ens'];
+
+//   await contract.methods.buy('mdt').send({
+//     ...sendOptions,
+//     value: web3.utils.toWei('0.005', 'ether')
+//   });
+//   t.pass();
+// });
+
+// test('Alpress Contract > publish', async t => {
+//   const contract = t.context['alpress'];
+//   const { sendOptions } = t.context['ens'];
+//   await contract.methods
+//     .publish(
+//       'mdt',
+//       `0x${contentHash.fromIpfs('QmVNJbmxqpCj2kKB8ddtAweKU1dWeNisymCdNiYw6wokyz')}`
+//     )
+//     .send(sendOptions);
+//   t.pass();
+// });
+
+
+test('Alpress Contract > buy and init Alpress', async t => {
   const contract = t.context['alpress'];
   const { sendOptions, web3 } = t.context['ens'];
 
-  await contract.methods.buy('mdt').send({
+  await contract.methods.buyAndInitAlpress(
+    'mdt', 
+    `0x${contentHash.fromIpfs('QmVNJbmxqpCj2kKB8ddtAweKU1dWeNisymCdNiYw6wokyz')}`
+  ).send({
     ...sendOptions,
     value: web3.utils.toWei('0.005', 'ether')
   });
+
   t.pass();
 });
 
@@ -346,18 +374,6 @@ test('Alpress Contract > renew domain', async t => {
     ...sendOptions,
     value: web3.utils.toWei('0.005', 'ether')
   });
-  t.pass();
-});
-
-test('Alpress Contract > publish', async t => {
-  const contract = t.context['alpress'];
-  const { sendOptions } = t.context['ens'];
-  await contract.methods
-    .publish(
-      'mdt',
-      `0x${contentHash.fromIpfs('QmVNJbmxqpCj2kKB8ddtAweKU1dWeNisymCdNiYw6wokyz')}`
-    )
-    .send(sendOptions);
   t.pass();
 });
 
