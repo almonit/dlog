@@ -73,6 +73,44 @@ contract Alpress {
         emit NewRegistration(label, name);
     }
 
+    function buyAndInitAlpress(string calldata name, bytes calldata contentHash) external payable {
+        bytes32 label = keccak256(bytes(name));
+
+        // Blog must not be already registered.
+        require(
+            ((ens.owner(keccak256(abi.encodePacked(platformNode, label))) ==
+                address(0)) || (blogs[label].owner == address(0))),
+            'Subdomain is already taken'
+        );
+        // User must not have more than one account
+        require(holders[msg.sender] == 0, "User already has an account");
+        // User must have paid enough
+        require(msg.value >= rentPricePerYear, 'Not enough amount');
+
+        // Send any extra back
+        if (msg.value > rentPricePerYear) {
+            msg.sender.transfer(msg.value - rentPricePerYear);
+        }
+
+        // Register the domain in ENS
+        doRegistration(label);
+
+        // Create blog record
+        blogs[label].name = name;
+        blogs[label].owner = msg.sender;
+
+        //register for one year "approximately" (assuming accurate block time disregarding leap years)
+        blogs[label].expirationBlock = now + 365 days;
+        holders[msg.sender] = label;
+
+        bytes32 blogNode = keccak256(abi.encodePacked(platformNode, label));
+        resolver.setContenthash(blogNode, contentHash);
+
+
+        emit NewRegistration(label, name);
+        emit Publication(label, contentHash);
+    }
+
     function renew(string calldata name) external payable {
         bytes32 label = keccak256(bytes(name));
 
