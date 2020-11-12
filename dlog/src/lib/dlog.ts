@@ -407,10 +407,15 @@ export class DLog {
     const user_cid: IPFSPath = await this.createIdentity(identity);
     const msg = new TextEncoder().encode(`${subdomain} ${user_cid.toString()}\n`)
     await this.node.pubsub.publish(this.swarm_topic, msg)
-    const result = await this.alpress.methods
-      .publish(subdomain, this.encodeCID(user_cid.toString()))
-      .send(options);
-    return result;
+
+    try {
+      const result = await this.alpress.methods
+        .publish(subdomain, this.encodeCID(user_cid.toString()))
+        .send(options);
+      return result;
+    } catch(error) {
+      return error;
+    }
   }
 
   public async retrieveContentFromFile(): Promise<Bucket> {
@@ -516,17 +521,25 @@ export class DLog {
     const user_cid = await this.createIdentity(_identity);
     console.log("DEBUG user_cid: ", user_cid);
     
-    await this.alpress.methods.buy(subdomain).send({
-      ...options,
-      value: this.web3.utils.toWei('0.005', 'ether')
-    });
+    try {
+      await this.alpress.methods.buy(subdomain).send({
+        ...options,
+        value: this.web3.utils.toWei('0.005', 'ether')
+      });
+    } catch(error) {
+      return error;
+    }
 
-    const result = await this.alpress.methods
-      .publish(subdomain, this.encodeCID(user_cid.toString()))
-      .send(options);
-
-    await this.setSubdomain(options);
-    return result;
+    try {
+      const result = await this.alpress.methods
+        .publish(subdomain, this.encodeCID(user_cid.toString()))
+        .send(options);
+     
+      await this.setSubdomain(options);
+      return result;
+    } catch(error) {
+      return error;
+    }
   }
 
   public async login(options) {
@@ -545,14 +558,25 @@ export class DLog {
   }
 
   public async setSubdomain(options): Promise<string | null> {
-    const result = await this.alpress.methods.getName().call(options);
-    if (result) this.session.setSubdomain(result);
-    return result;
+     try {
+      const result = await this.alpress.methods.getName().call(options);
+      
+      if (result) 
+        this.session.setSubdomain(result);
+
+      return result;
+    } catch(error) {
+      return error;
+    }
   }
 
   public async checkTaken(domain: string): Promise<boolean> {
-    const takenResult = await this.alpress.methods.checkTaken(domain).call();
-    return takenResult;
+    try {
+      const takenResult = await this.alpress.methods.checkTaken(domain).call();
+      return takenResult;
+    } catch(error) {
+      return error;
+    }
   }
 
   /**
@@ -633,9 +657,14 @@ export class DLog {
 
   public async getContenthash(subdomain: string): Promise<string> {
     const sub_address = namehash.hash(`${subdomain}.${DLog.ROOT_DOMAIN}`);
-    const content = await this.resolver.methods.contenthash(sub_address).call();
-    const content_hash = contentHash.decode(content);
-    return content_hash;
+
+    try {
+      const content = await this.resolver.methods.contenthash(sub_address).call();
+      const content_hash = contentHash.decode(content);
+      return content_hash;
+    } catch(error) {
+      return error;
+    }
   }
 
   // private async setContentHash(ens: ENSContent): Promise<string> {
