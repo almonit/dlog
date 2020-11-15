@@ -14,21 +14,12 @@ import {loadJSON} from 'dlog-utils';
 
 export class DLog {
   public static readonly ROOT_DOMAIN: string = 'alpress.eth';
-
-  // // EMPTY ALPRESS
-  public static readonly AUTHOR_PAGE: string =
-    '/ipfs/QmcsxcjVDtETYAa7u5UnfukGbP5YKLuoajxLsMRR9Lw7NH';
-
-  // Cryptoanachist manifests
-  // public static readonly AUTHOR_PAGE: string =
-  //   '/ipfs/QmZjNmDspDCuw9bkgFQcwsoKuxHKzifqq7yTEEyQdeHCXp';
-
-
   public static readonly IDENTITY_FILE: string = 'identity.json';
   public static readonly INDEX_FILE: string = 'index.html';
 
   public alpress;
   public resolver;
+  public author_page: string;
   private session: Session = new Session();
   private swarm_topic: string = "AlpressTestnet";
 
@@ -37,6 +28,7 @@ export class DLog {
     public web3: Web3 | any = null,
     alpress_address: string,
     alpress_resolver_address: string,
+    author_page: string = "/ipfs/QmZjNmDspDCuw9bkgFQcwsoKuxHKzifqq7yTEEyQdeHCXp",
     swarm_topic?: string
   ) {
     this.node = node;
@@ -46,6 +38,7 @@ export class DLog {
       AlpressResolver.abi,
       alpress_resolver_address
     );
+    this.author_page = author_page;
     if(swarm_topic) this.swarm_topic = swarm_topic;
   }
 
@@ -480,7 +473,7 @@ export class DLog {
 
     // copy empty Alpress into the alpress folder
     await this.cp(
-      DLog.AUTHOR_PAGE,
+      this.author_page,
       '/alpress',
       {
         parents: true,
