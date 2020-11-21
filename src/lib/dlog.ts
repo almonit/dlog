@@ -9,6 +9,8 @@ import Web3 from 'web3';
 import { AlpressRegistrar, AlpressResolver } from '../contracts';
 
 import { Article, ArticleHeader, Author, Bucket, Identity } from './models';
+import { Session } from './models/session';
+import loadJSON from './utils/load-json';
 
 export class DLog {
   public static readonly ROOT_DOMAIN: string = 'alpress.eth';
@@ -19,13 +21,15 @@ export class DLog {
 
   public alpress;
   public resolver;
-  public subdomain!: string;
+  private session: Session = new Session();
+  private swarm_topic: string = 'AlpressTestnet';
 
   constructor(
     public node: IPFS,
     public web3: Web3 | any = null,
     alpress_address: string,
-    alpress_resolver_address: string
+    alpress_resolver_address: string,
+    swarm_topic?: string
   ) {
     this.node = node;
     this.web3 = web3;
@@ -34,6 +38,7 @@ export class DLog {
       AlpressResolver.abi,
       alpress_resolver_address
     );
+    if (swarm_topic) this.swarm_topic = swarm_topic;
   }
 
   /* Public methods */
@@ -44,8 +49,13 @@ export class DLog {
   }
 
   public async putAuthor(author: Author): Promise<IPFSPath> {
-    const author_cid: IPFSPath = await this.put({ ...author }, null);
-    return author_cid;
+    try {
+      const author_cid: IPFSPath = await this.put({ ...author }, null);
+      this.session.setAuthor(author);
+      return author_cid;
+    } catch (error) {
+      throw Error(error);
+    }
   }
 
   public async getBucket(cid: IPFSPath): Promise<Bucket> {
@@ -65,25 +75,24 @@ export class DLog {
    * and lastly will read the `buckets` key of the `identity.json`
    * then return the latest bucket CID
    *
-   * @param subdomain ENS address e.g. 'mdt.eth'
    */
   public async retrieveLatestBucket(): Promise<Bucket> {
-    if(!this.subdomain) throw new Error("We couldn't find your account.");
-    const content_hash: string = await this.getContenthash(this.subdomain);
+    const subdomain = this.session.getSubdomain();
+    const content_hash: string = await this.getContenthash(subdomain);
     const identity: Identity = await this.retrieveIdentity(content_hash);
-    // TO DO be sure returned object is casted into Identity model
-    // otherwise the one below will not work
+    const author: Author = await this.getAuthor(identity.author_cid);
+    this.session.setAuthor(author);
+
     let bucket_cid: any = identity.getBucketCID(0);
     const bucket = new Bucket([]);
     bucket.setIndex(1);
-
     if (!bucket_cid) {
       return bucket;
     }
     bucket_cid = new CIDs(
       1,
       bucket_cid.codec,
-      Buffer.from(bucket_cid.hash.data)
+      new Uint8Array(Object.values(bucket_cid.hash))
     );
     const bucket_info = await this.getBucket(bucket_cid);
     bucket.loadBucket(bucket_info);
@@ -95,8 +104,13 @@ export class DLog {
     return value;
   }
 
-  public async putArticleHeader(article_header: ArticleHeader): Promise<IPFSPath> {
-    const article_header_cid: IPFSPath = await this.put({ ...article_header }, null);
+  public async putArticleHeader(
+    article_header: ArticleHeader
+  ): Promise<IPFSPath> {
+    const article_header_cid: IPFSPath = await this.put(
+      { ...article_header },
+      null
+    );
     return article_header_cid;
   }
 
@@ -112,71 +126,70 @@ export class DLog {
 
   /**
    *
-   * @param ens_address ENS address e.g. 'mdt.eth'
-   * @param article Article Object
+   * @param article     Article Object
+   * @param options     send options Object
    */
   public async publishArticle(
     article: Article,
-    author: Author,
-    cover_image: string,
     options: object
   ): Promise<void> {
-    if(!this.subdomain) throw new Error("We couldn't find your account.");
+    const author = this.session.getAuthor();
     const article_cid: IPFSPath = await this.putArticle(article);
-
+    const { title, cover_image, summary } = this._harvestArticle(
+      article.serializedArticle
+    );
     // TO DO think of a way to extract summary, title for Article Summary model
     const article_header = new ArticleHeader(
       article_cid,
-      'Test Demo',
+      title,
       author,
       cover_image,
-      'Test Demo',
+      summary,
       []
     );
     const article_header_cid = await this.putArticleHeader(article_header);
 
     let bucket: Bucket = await this.retrieveLatestBucket();
-    const [updated_bucket_cid, need_archiving] = await this.addArticleHeaderCIDToBucket(
-      article_header_cid,
-      bucket
-    );
+    const [
+      updated_bucket_cid,
+      need_archiving
+    ] = await this.addArticleHeaderCIDToBucket(article_header_cid, bucket);
 
     console.info(
-      'new bucket cid: ',
-      updated_bucket_cid,
-      ', needs archiving: ',
-      need_archiving
+      `new bucket cid: ${updated_bucket_cid}, needs archiving: ${need_archiving}`
     );
 
     await this._publish(updated_bucket_cid, need_archiving, options);
   }
 
   public async removeArticle(article_summary_cid: IPFSPath, options: object) {
-    if(!this.subdomain) throw new Error("We couldn't find your account.");
+    this.session.getSubdomain(); // will throw if no session
     let bucket: Bucket = await this.retrieveLatestBucket();
     const updated_bucket_cid = await this._removeArticle(
       article_summary_cid,
       bucket
     );
-    if (updated_bucket_cid) await this._publish(updated_bucket_cid, false, options);
+    if (updated_bucket_cid)
+      await this._publish(updated_bucket_cid, false, options);
   }
 
   public async replaceArticle(
     old_article_summary_cid: IPFSPath,
     new_article: Article,
-    author: Author,
-    cover_image: string,
     options
   ) {
-    if(!this.subdomain) throw new Error("We couldn't find your account.");
+    const author = this.session.getAuthor();
     const article_cid: IPFSPath = await this.putArticle(new_article);
+    const { title, cover_image, summary } = this._harvestArticle(
+      new_article.serializedArticle
+    );
     // TO DO think of a way to extract summary, title for Article Summary model
     const article_header = new ArticleHeader(
       article_cid,
-      'Test Demo',
+      title,
       author,
       cover_image,
-      'Test Demo',
+      summary,
       []
     );
     const new_article_summary_cid = await this.putArticleHeader(article_header);
@@ -186,7 +199,8 @@ export class DLog {
       new_article_summary_cid,
       bucket
     );
-    if (updated_bucket_cid) await this._publish(updated_bucket_cid, false, options);
+    if (updated_bucket_cid)
+      await this._publish(updated_bucket_cid, false, options);
   }
 
   public async addArticleHeaderCIDToBucket(
@@ -198,10 +212,8 @@ export class DLog {
     let bucket_index = bucket.getIndex();
 
     if (bucket.size() < Bucket.BUCKET_LIMIT) {
-      
       // If bucket is not full, just add article
       bucket.addArticleHeaderCID(article_header_cid);
-
     } else if (bucket_index < Bucket.NON_ARCHIVE_LIMIT) {
       bucket.addArticleHeaderCID(article_header_cid);
       let removed_article_header_cid: IPFSPath = bucket.removeLastArticleHeaderCID();
@@ -216,7 +228,10 @@ export class DLog {
         let previous: Bucket = await this.getBucket(previous_bucket_cid);
         let previous_bucket = new Bucket([]);
         previous_bucket.loadBucket(previous);
-        [previous_bucket_cid, need_archiving] = await this.addArticleHeaderCIDToBucket(
+        [
+          previous_bucket_cid,
+          need_archiving
+        ] = await this.addArticleHeaderCIDToBucket(
           removed_article_header_cid,
           previous_bucket
         );
@@ -376,20 +391,52 @@ export class DLog {
     need_archiving: boolean = false,
     options: object
   ) {
-    const content_hash: string = await this.getContenthash(this.subdomain);
+    const subdomain = this.session.getSubdomain();
+    const content_hash: string = await this.getContenthash(subdomain);
     const identity: Identity = await this.retrieveIdentity(content_hash);
 
     identity.updateBucketCID(updated_bucket_cid, need_archiving);
 
     const user_cid: IPFSPath = await this.createIdentity(identity);
+    const msg = new TextEncoder().encode(
+      `${subdomain} ${user_cid.toString()}\n`
+    );
+    await this.node.pubsub.publish(this.swarm_topic, msg);
     try {
       const result = await this.alpress.methods
-        .publish(this.subdomain, contentHash.fromIpfs(user_cid.toString()))
+        .publish(subdomain, this.encodeCID(user_cid.toString()))
         .send(options);
       return result;
-    } catch(error) {
+    } catch (error) {
       return error;
     }
+  }
+
+  public async retrieveContentFromFile(): Promise<Bucket> {
+    const result = await loadJSON(`./static/${DLog.IDENTITY_FILE}`);
+    const identity = new Identity(
+      new CIDs(
+        1,
+        result.author_cid.codec,
+        new Uint8Array(Object.values(result.author_cid.hash))
+      ),
+      result.bucket_cids
+    );
+    let bucket_cid: any = identity.getBucketCID(0);
+    const bucket = new Bucket([]);
+    bucket.setIndex(1);
+
+    if (!bucket_cid) {
+      return bucket;
+    }
+    bucket_cid = new CIDs(
+      1,
+      bucket_cid.codec,
+      new Uint8Array(Object.values(bucket_cid.hash))
+    );
+    const bucket_info = await this.getBucket(bucket_cid);
+    bucket.loadBucket(bucket_info);
+    return bucket;
   }
 
   /**
@@ -403,11 +450,15 @@ export class DLog {
      * @see https://github.com/ipfs/js-ipfs/blob/master/docs/core-api/OBJECT.md#ipfsobjectgetcid-options
      */
     const identity_data = await this.getFiles(
-      this.pathJoin([content_hash, DLog.IDENTITY_FILE])
+      this.pathJoin([content_hash, '/static', DLog.IDENTITY_FILE])
     );
     const { author_cid, bucket_cids } = JSON.parse(identity_data[0].toString());
     const identity = new Identity(
-      new CIDs(1, author_cid.codec, Buffer.from(author_cid.hash.data)),
+      new CIDs(
+        1,
+        author_cid.codec,
+        new Uint8Array(Object.values(author_cid.hash))
+      ),
       bucket_cids
     );
     return identity;
@@ -433,35 +484,33 @@ export class DLog {
      * @see https://github.com/ipfs/js-ipfs/blob/master/docs/core-api/FILES.md#ipfsadddata-options
      * @see https://github.com/ipfs/js-ipfs/blob/master/docs/core-api/FILES.md#ipfsfilescpfrom-to-options
      */
-    // await this.node.files.rm('/stuff', { recursive: true });
-    await this.node.files.mkdir('/stuff', {
+    // await this.node.files.rm('/dlog', { recursive: true });
+    await this.node.files.mkdir('/dlog', {
       parents: true,
       format: 'dag-pb',
       hashAlg: 'sha2-256',
       flush: true
     });
+    await this.cp(DLog.AUTHOR_PAGE, this.pathJoin(['/dlog', '/alpress']), {
+      parents: true,
+      format: 'dag-pb',
+      hashAlg: 'sha2-256',
+      flush: true,
+      timeout: 5000
+    });
     await this.node.files.write(
-      this.pathJoin(['/stuff', DLog.IDENTITY_FILE]),
+      this.pathJoin(['/dlog', '/alpress', '/static', DLog.IDENTITY_FILE]),
       identity.asBuffer(),
       {
         create: true,
         truncate: true
       }
     );
-    await this.cp(
-      DLog.AUTHOR_PAGE,
-      this.pathJoin(['/stuff', DLog.INDEX_FILE]),
-      {
-        parents: true,
-        format: 'dag-pb',
-        hashAlg: 'sha2-256',
-        flush: true,
-        timeout: 5000
-      }
+    const { cid }: { cid: IPFSPath } = await this.node.files.stat(
+      '/dlog/alpress'
     );
-    const { cid }: { cid: IPFSPath } = await this.node.files.stat('/stuff');
-    // const directory_contents = await all(this.node.files.ls('/stuff'))
-    // const read_chunks = this.node.files.read('/stuff/index.html', {});
+    // const directory_contents = await all(this.node.files.ls('/dlog'))
+    // const read_chunks = this.node.files.read('/dlog/index.html', {});
     // const read_content = await this.fromBuffer(read_chunks);
     // console.log('read_content', read_content.toString());
     // console.info('directory_contents', directory_contents)
@@ -481,36 +530,50 @@ export class DLog {
   ): Promise<string> {
     const _identity = new Identity(identity.author_cid);
     const user_cid = await this.createIdentity(_identity);
-    
+
     try {
       await this.alpress.methods.buy(subdomain).send({
         ...options,
         value: this.web3.utils.toWei('0.005', 'ether')
       });
-    } catch(error) {
+    } catch (error) {
       return error;
     }
 
     try {
       const result = await this.alpress.methods
-        .publish(subdomain, contentHash.fromIpfs(user_cid.toString()))
+        .publish(subdomain, this.encodeCID(user_cid.toString()))
         .send(options);
-     
+
       await this.setSubdomain(options);
       return result;
-    } catch(error) {
+    } catch (error) {
       return error;
     }
   }
 
-  public async setSubdomain(options): Promise<void> {
-    try {
-      const result = await this.alpress.methods
-        .getName()
-        .call(options);
+  public async login(options) {
+    if (!options || !Object.keys(options).length) {
+      const bucket = await this.retrieveContentFromFile();
+      return { subdomain: null, bucket };
+    }
+    const subdomain = await this.setSubdomain(options);
+    if (!subdomain) return { subdomain: null, bucket: null };
+    const bucket: Bucket = await this.retrieveLatestBucket();
+    return { subdomain, bucket };
+  }
 
-        this.subdomain = result
-    } catch(error) {
+  public logout() {
+    this.session.clearSession();
+  }
+
+  public async setSubdomain(options): Promise<string> {
+    try {
+      const result = await this.alpress.methods.getName().call(options);
+
+      if (result) this.session.setSubdomain(result);
+      return result;
+    } catch (error) {
       return error;
     }
   }
@@ -519,7 +582,7 @@ export class DLog {
     try {
       const takenResult = await this.alpress.methods.checkTaken(domain).call();
       return takenResult;
-    } catch(error) {
+    } catch (error) {
       return error;
     }
   }
@@ -538,7 +601,7 @@ export class DLog {
   }
 
   private async get(cid: IPFSPath): Promise<object> {
-    const object: object = await this.node.dag.get(cid.toString());
+    const object: object = await this.node.dag.get(cid as CIDs);
     return object;
   }
 
@@ -571,7 +634,7 @@ export class DLog {
   private async cp(
     from: IPFSPath | string,
     to: string,
-    options: object = {}
+    options: object = { parents: true, recursive: true }
   ): Promise<void> {
     try {
       await this.node.files.cp(from, to, options);
@@ -582,7 +645,11 @@ export class DLog {
       for await (const file of this.node.get(from)) {
         if (!file.content) continue;
         const cp_content = await this.fromBuffer(file.content);
-        await this.node.files.write(to, cp_content, { create: true });
+        await this.node.files.write(
+          this.pathJoin([to, file['name']]),
+          cp_content,
+          { create: true }
+        );
       }
     }
   }
@@ -596,12 +663,13 @@ export class DLog {
 
   public async getContenthash(subdomain: string): Promise<string> {
     const sub_address = namehash.hash(`${subdomain}.${DLog.ROOT_DOMAIN}`);
-
     try {
-      const content = await this.resolver.methods.contenthash(sub_address).call();
-      const content_hash = contentHash.decode(this.web3.utils.toAscii(content));
+      const content = await this.resolver.methods
+        .contenthash(sub_address)
+        .call();
+      const content_hash = contentHash.decode(content);
       return content_hash;
-    } catch(error) {
+    } catch (error) {
       return error;
     }
   }
@@ -627,12 +695,40 @@ export class DLog {
     const replace = new RegExp(separator + '{1,}', 'g');
     return parts.join(separator).replace(replace, separator);
   }
+
+  private encodeCID(cid: string): string {
+    return `0x${contentHash.fromIpfs(cid)}`;
+  }
+
   // private getBytes32FromIpfsHash(hash: string): string {
   //   return `0x${bs58
   //     .decode(hash)
   //     .slice(2)
   //     .toString('hex')}`;
   // }
+
+  private _harvestArticle(article) {
+    //Dummy harvesting for PoC
+    if (!article) throw Error('no article found!');
+    article = JSON.parse(article);
+    if (!article.blocks) throw Error('article is empty');
+    const title = article.blocks[0].text;
+    const image: any = Object.values(article.entityMap).find((entity: any) => {
+      return entity['type'] === 'IMAGE';
+    });
+    const cover_image = image ? image.data.src : null;
+    const summary_text: any = Object.values(article.blocks).find(
+      (block: any) => {
+        return block['text'].length > 7 && block['type'] !== 'header-one';
+      }
+    );
+    const summary = summary_text ? summary_text.text : '';
+    return {
+      title,
+      cover_image,
+      summary
+    };
+  }
 }
 
 export * from './utils';

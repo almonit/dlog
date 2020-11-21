@@ -48,7 +48,7 @@ test('verify version', async t => {
 
 test('put/get author', async t => {
   const dlog = t.context['dlog'];
-  const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
+  const author: Author = { name: 'mdt', profile_image: '', description: '' };
   const cid_author = await dlog.putAuthor(author);
   const result_author = await dlog.getAuthor(cid_author.toString());
   t.is(result_author.name, author.name);
@@ -58,40 +58,44 @@ test('put/get article', async t => {
   const dlog = t.context['dlog'];
   const article = new Article('Test');
   const cid_article = await dlog.putArticle(article);
-  const result_article : Article = await dlog.getArticle(cid_article.toString());
+  const result_article: Article = await dlog.getArticle(cid_article.toString());
   t.is(result_article.serializedArticle, article.serializedArticle);
 });
 
 test('put/get article header', async t => {
   const dlog = t.context['dlog'];
-  const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
+  const author: Author = { name: 'mdt', profile_image: '', description: '' };
   const article = new Article('Test');
   const article_cid = await dlog.putArticle(article);
 
   const article_header = new ArticleHeader(
     article_cid,
-    "Test title",
+    'Test title',
     author,
     'base64_img',
     'Test',
     []
   );
   const article_header_cid = await dlog.putArticleHeader(article_header);
-  const result_article_header = await dlog.getArticleHeader(article_header_cid.toString());
+  const result_article_header = await dlog.getArticleHeader(
+    article_header_cid.toString()
+  );
   t.is(result_article_header.title, article_header.title);
 });
 
 test('test archiving', async t => {
   const ARTICLES_TO_PUSH = 31;
   const dlog = t.context['dlog'];
-  const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
+  const author: Author = { name: 'mdt', profile_image: '', description: '' };
 
-  const article = new Article('Test');
+  const article = new Article(
+    '{"blocks":[{"key":"b8nf6","text":"test","type":"header-one","depth":0,"inlineStyleRanges":[],"entityRanges":[],"data":{}}],"entityMap":{}}'
+  );
   const article_cid = await dlog.putArticle(article);
 
   const article_header = new ArticleHeader(
     article_cid,
-    "Test title",
+    'Test title',
     author,
     'base64_img',
     'Test',
@@ -121,13 +125,13 @@ test('test archiving', async t => {
 
 test('put/get bucket', async t => {
   const dlog = t.context['dlog'];
-  const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
+  const author: Author = { name: 'mdt', profile_image: '', description: '' };
   const article = new Article('Test');
   const article_cid = await dlog.putArticle(article);
 
   const article_header = new ArticleHeader(
     article_cid,
-    "Test title",
+    'Test title',
     author,
     'base64_img',
     'Test',
@@ -141,38 +145,63 @@ test('put/get bucket', async t => {
   let result_bucket = new Bucket([]);
   let temp_bucket = (await dlog.getBucket(cid_bucket.toString())) as Bucket;
   result_bucket.loadBucket(temp_bucket);
-  t.deepEqual(result_bucket.getArticleHeaderCID(0), bucket.getArticleHeaderCID(0));
+  t.deepEqual(
+    result_bucket.getArticleHeaderCID(0).toString(),
+    bucket.getArticleHeaderCID(0).toString()
+  );
 });
 
 test('put/get identity', async t => {
   const dlog = t.context['dlog'];
-  const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
+  const author: Author = { name: 'mdt', profile_image: '', description: '' };
   const author_cid = await dlog.putAuthor(author);
   const identity = new Identity(author_cid);
   const identity_cid = await dlog.createIdentity(identity);
   // const pinned_cid = await dlog.pinIdentity(identity_cid);
   const result_identity = await dlog.retrieveIdentity(identity_cid);
-  t.is(JSON.stringify(identity), JSON.stringify(result_identity));
+  t.is(identity.toString(), result_identity.toString());
+  dlog.logout();
 });
 
 test('register secondary account', async t => {
   const dlog = t.context['dlog'];
   const { secondary_account, sendOptions } = t.context['ens'];
-  const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
+  const author: Author = { name: 'mdt', profile_image: '', description: '' };
   const author_cid = await dlog.putAuthor(author);
   const identity = new Identity(author_cid);
-  await dlog.register('testing', identity, {...sendOptions, from: secondary_account});
+  await dlog.register('testing', identity, {
+    ...sendOptions,
+    from: secondary_account
+  });
   const content_hash = await dlog.getContenthash('testing');
   const retrieved_identity = await dlog.retrieveIdentity(content_hash);
-  t.is(retrieved_identity.author_cid.toString(), identity.author_cid.toString());
+  t.is(
+    retrieved_identity.author_cid.toString(),
+    identity.author_cid.toString()
+  );
+  dlog.logout();
+});
+
+test('login secondary account', async t => {
+  const dlog = t.context['dlog'];
+  const { secondary_account, sendOptions } = t.context['ens'];
+  const { subdomain } = await dlog.login({
+    ...sendOptions,
+    from: secondary_account
+  });
+  t.is(subdomain, 'testing');
 });
 
 test('publish article', async t => {
   const dlog = t.context['dlog'];
   const { secondary_account, sendOptions } = t.context['ens'];
-  const article = new Article("test content");
-  const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
-  await dlog.publishArticle(article, author, "", {...sendOptions, from: secondary_account});
+  const article = new Article(
+    '{"blocks":[{"key":"b8nf6","text":"test","type":"header-one","depth":0,"inlineStyleRanges":[],"entityRanges":[],"data":{}}],"entityMap":{}}'
+  );
+  await dlog.publishArticle(article, {
+    ...sendOptions,
+    from: secondary_account
+  });
   t.pass();
 });
 
@@ -180,27 +209,50 @@ test('edit article', async t => {
   const dlog = t.context['dlog'];
   const { secondary_account, sendOptions } = t.context['ens'];
 
-  const article = new Article("test content");
-  const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
-  await dlog.publishArticle(article, author, "", {...sendOptions, from: secondary_account});
-  const { article_header_cids: article_cids_old } = await dlog.retrieveLatestBucket();
-  const article2 = new Article("test content 2");
-  
-  await dlog.replaceArticle(article_cids_old[0], article2, author, "", {...sendOptions, from: secondary_account});
-  const { article_header_cids: article_cids_new } = await dlog.retrieveLatestBucket();
+  const article = new Article(
+    '{"blocks":[{"key":"b8nf6","text":"test","type":"header-one","depth":0,"inlineStyleRanges":[],"entityRanges":[],"data":{}}],"entityMap":{}}'
+  );
+  await dlog.publishArticle(article, {
+    ...sendOptions,
+    from: secondary_account
+  });
+  const {
+    article_header_cids: article_cids_old
+  } = await dlog.retrieveLatestBucket();
+  const article2 = new Article(
+    '{"blocks":[{"key":"b8nf6","text":"test 2","type":"header-one","depth":0,"inlineStyleRanges":[],"entityRanges":[],"data":{}}],"entityMap":{}}'
+  );
+  await dlog.replaceArticle(article_cids_old[0], article2, {
+    ...sendOptions,
+    from: secondary_account
+  });
+  const {
+    article_header_cids: article_cids_new
+  } = await dlog.retrieveLatestBucket();
   t.not(article_cids_old[0].toString(), article_cids_new[0].toString());
 });
 
 test('remove article', async t => {
   const dlog = t.context['dlog'];
   const { secondary_account, sendOptions } = t.context['ens'];
-  const article = new Article("test content");
-  const author: Author = { name: 'mdt', profile_image: '', social_links: [] };
-  await dlog.publishArticle(article, author, "", {...sendOptions, from: secondary_account});
-  const { article_header_cids: article_cids_old } = await dlog.retrieveLatestBucket();
-  
-  await dlog.removeArticle(article_cids_old[0], {...sendOptions, from: secondary_account});
-  const { article_header_cids: article_cids_new } = await dlog.retrieveLatestBucket();
+  const article = new Article(
+    '{"blocks":[{"key":"b8nf6","text":"test","type":"header-one","depth":0,"inlineStyleRanges":[],"entityRanges":[],"data":{}}],"entityMap":{}}'
+  );
+  await dlog.publishArticle(article, {
+    ...sendOptions,
+    from: secondary_account
+  });
+  const {
+    article_header_cids: article_cids_old
+  } = await dlog.retrieveLatestBucket();
+
+  await dlog.removeArticle(article_cids_old[0], {
+    ...sendOptions,
+    from: secondary_account
+  });
+  const {
+    article_header_cids: article_cids_new
+  } = await dlog.retrieveLatestBucket();
   t.assert(article_cids_old.length > article_cids_new.length);
 });
 
@@ -303,7 +355,7 @@ test('Alpress Contract > publish', async t => {
   await contract.methods
     .publish(
       'mdt',
-      contentHash.fromIpfs('QmVNJbmxqpCj2kKB8ddtAweKU1dWeNisymCdNiYw6wokyz')
+      `0x${contentHash.fromIpfs('QmVNJbmxqpCj2kKB8ddtAweKU1dWeNisymCdNiYw6wokyz')}`
     )
     .send(sendOptions);
   t.pass();

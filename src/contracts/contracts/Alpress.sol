@@ -10,9 +10,8 @@ contract Alpress {
     bytes32
         public constant TLD_NODE = 0x93cdeb708b7545dc668eb9280176169d1c33cfd8ed6f04690a0bcc88a93fc4ae; // namehash('eth')
     bytes32 platformNode = keccak256(abi.encodePacked(TLD_NODE, platform)); //TODO hardcode maybe?
-    AlpressResolver public resolver; // ENS standard resolver
+    AlpressResolver public resolver; // Custom Alpress resolver
     address private almonit;
-    //address almonit = 0xC741cdDa197Af87Acd54a4A5f563C8efDbc754B7; // Almonit multisig account
 
     uint256 private rentPricePerYear = 4000000000000000; // price in Wei of renting a blog for one year
     ENS public ens;
@@ -24,7 +23,7 @@ contract Alpress {
 
     event NewRegistration(bytes32 indexed label, string name);
 
-    event Publication(bytes32 indexed label, string contentHash);
+    event Publication(bytes32 indexed label, bytes contentHash);
 
     struct Blog {
         string name;
@@ -138,7 +137,7 @@ contract Alpress {
         ens.setOwner(blogNode, msg.sender);
     }
 
-    function publish(string calldata name, string calldata contentHash)
+    function publish(string calldata name, bytes calldata contentHash)
         external
     {
         bytes32 label = keccak256(bytes(name));
@@ -154,12 +153,8 @@ contract Alpress {
         );
 
         bytes32 blogNode = keccak256(abi.encodePacked(platformNode, label));
-        // bytes memory setContenthashEncoded = abi.encodePacked(
-        //     bytes4(keccak256('setContenthash(bytes32, bytes calldata)')),
-        //     blogNode,
-        //     bytes(contentHash)
-        // );
-        resolver.setContenthash(blogNode, bytes(contentHash));
+        
+        resolver.setContenthash(blogNode, contentHash);
         emit Publication(label, contentHash);
     }
 
