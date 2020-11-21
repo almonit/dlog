@@ -15,7 +15,7 @@ import loadJSON from './utils/load-json';
 export class DLog {
   public static readonly ROOT_DOMAIN: string = 'alpress.eth';
   public static readonly AUTHOR_PAGE: string =
-    '/ipfs/QmYfDUEu64Px9GcmaP4LhuD4DJJ2ycos8WqWcyKMyp4FWL';
+    '/ipfs/QmTRfMMmTVwTynpZ83CTYLi7ASA8Xi3SSLBdDL6eGUUuat';
   public static readonly IDENTITY_FILE: string = 'identity.json';
   public static readonly INDEX_FILE: string = 'index.html';
 
@@ -400,10 +400,14 @@ export class DLog {
     const user_cid: IPFSPath = await this.createIdentity(identity);
     const msg = new TextEncoder().encode(`${subdomain} ${user_cid.toString()}\n`)
     await this.node.pubsub.publish(this.swarm_topic, msg)
-    const result = await this.alpress.methods
-      .publish(subdomain, this.encodeCID(user_cid.toString()))
-      .send(options);
-    return result;
+    try {
+      const result = await this.alpress.methods
+        .publish(subdomain, this.encodeCID(user_cid.toString()))
+        .send(options);
+      return result;
+    } catch(error) {
+      return error;
+    }
   }
 
   public async retrieveContentFromFile(): Promise<Bucket> {
@@ -522,42 +526,47 @@ export class DLog {
   ): Promise<string> {
     const _identity = new Identity(identity.author_cid);
     const user_cid = await this.createIdentity(_identity);
-    await this.alpress.methods.buy(subdomain).send({
-      ...options,
-      value: this.web3.utils.toWei('0.005', 'ether')
-    });
-    const result = await this.alpress.methods
-      .publish(subdomain, this.encodeCID(user_cid.toString()))
-      .send(options);
-
-    await this.setSubdomain(options);
-    return result;
-  }
-
-  public async login(options) {
-    if (!options || !Object.keys(options).length) {
-      const bucket = await this.retrieveContentFromFile();
-      return { subdomain: null, bucket };
+    
+    try {
+      await this.alpress.methods.buy(subdomain).send({
+        ...options,
+        value: this.web3.utils.toWei('0.005', 'ether')
+      });
+    } catch(error) {
+      return error;
     }
-    const subdomain = await this.setSubdomain(options);
-    if (!subdomain) return { subdomain: null, bucket: null };
-    const bucket: Bucket = await this.retrieveLatestBucket();
-    return { subdomain, bucket };
+
+    try {
+      const result = await this.alpress.methods
+        .publish(subdomain, this.encodeCID(user_cid.toString()))
+        .send(options);
+     
+      await this.setSubdomain(options);
+      return result;
+    } catch(error) {
+      return error;
+    }
   }
 
-  public logout() {
-    this.session.clearSession();
-  }
+  public async setSubdomain(options): Promise<void> {
+    try {
+      const result = await this.alpress.methods
+        .getName()
+        .call(options);
 
-  public async setSubdomain(options): Promise<string | null> {
-    const result = await this.alpress.methods.getName().call(options);
-    if (result) this.session.setSubdomain(result);
-    return result;
+        if (result) this.session.setSubdomain(result);
+    } catch(error) {
+      return error;
+    }
   }
 
   public async checkTaken(domain: string): Promise<boolean> {
-    const takenResult = await this.alpress.methods.checkTaken(domain).call();
-    return takenResult;
+    try {
+      const takenResult = await this.alpress.methods.checkTaken(domain).call();
+      return takenResult;
+    } catch(error) {
+      return error;
+    }
   }
 
   /**
@@ -632,9 +641,13 @@ export class DLog {
 
   public async getContenthash(subdomain: string): Promise<string> {
     const sub_address = namehash.hash(`${subdomain}.${DLog.ROOT_DOMAIN}`);
-    const content = await this.resolver.methods.contenthash(sub_address).call();
-    const content_hash = contentHash.decode(content);
-    return content_hash;
+    try {
+      const content = await this.resolver.methods.contenthash(sub_address).call();
+      const content_hash = contentHash.decode(this.web3.utils.toAscii(content));
+      return content_hash;
+    } catch(error) {
+      return error;
+    }
   }
 
   // private async setContentHash(ens: ENSContent): Promise<string> {
@@ -660,7 +673,7 @@ export class DLog {
   }
 
   private encodeCID(cid: string): string {
-    return `0x${contentHash.fromIpfs(cid)}`
+    return contentHash.fromIpfs(cid.toString())
   }
 
   // private getBytes32FromIpfsHash(hash: string): string {
