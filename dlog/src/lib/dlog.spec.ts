@@ -34,7 +34,8 @@ test.before(async t => {
     ipfs,
     web3,
     contractAlpressRegistrar.options.address,
-    contractResolver.options.address
+    contractResolver.options.address,
+    "/ipfs/QmZjNmDspDCuw9bkgFQcwsoKuxHKzifqq7yTEEyQdeHCXp"
   );
   t.context['alpress'] = contractAlpressRegistrar;
 });
