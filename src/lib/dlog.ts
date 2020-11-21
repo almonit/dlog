@@ -13,7 +13,7 @@ import { Article, ArticleHeader, Author, Bucket, Identity } from './models';
 export class DLog {
   public static readonly ROOT_DOMAIN: string = 'alpress.eth';
   public static readonly AUTHOR_PAGE: string =
-    '/ipfs/QmamDJKm5DtpxtHdF8raZm4Nz7QV19WQSyP64sdUQKDFfi';
+    '/ipfs/QmTRfMMmTVwTynpZ83CTYLi7ASA8Xi3SSLBdDL6eGUUuat';
   public static readonly IDENTITY_FILE: string = 'identity.json';
   public static readonly INDEX_FILE: string = 'index.html';
 
@@ -382,10 +382,14 @@ export class DLog {
     identity.updateBucketCID(updated_bucket_cid, need_archiving);
 
     const user_cid: IPFSPath = await this.createIdentity(identity);
-    const result = await this.alpress.methods
-      .publish(this.subdomain, contentHash.fromIpfs(user_cid.toString()))
-      .send(options);
-    return result;
+    try {
+      const result = await this.alpress.methods
+        .publish(this.subdomain, contentHash.fromIpfs(user_cid.toString()))
+        .send(options);
+      return result;
+    } catch(error) {
+      return error;
+    }
   }
 
   /**
@@ -477,28 +481,47 @@ export class DLog {
   ): Promise<string> {
     const _identity = new Identity(identity.author_cid);
     const user_cid = await this.createIdentity(_identity);
-    await this.alpress.methods.buy(subdomain).send({
-      ...options,
-      value: this.web3.utils.toWei('0.005', 'ether')
-    });
-    const result = await this.alpress.methods
-      .publish(subdomain, contentHash.fromIpfs(user_cid.toString()))
-      .send(options);
     
-    await this.setSubdomain(options)
-    return result;
+    try {
+      await this.alpress.methods.buy(subdomain).send({
+        ...options,
+        value: this.web3.utils.toWei('0.005', 'ether')
+      });
+    } catch(error) {
+      return error;
+    }
+
+    try {
+      const result = await this.alpress.methods
+        .publish(subdomain, contentHash.fromIpfs(user_cid.toString()))
+        .send(options);
+     
+      await this.setSubdomain(options);
+      return result;
+    } catch(error) {
+      return error;
+    }
   }
 
   public async setSubdomain(options): Promise<void> {
-    const result = await this.alpress.methods
-      .getName()
-      .call(options);
-    this.subdomain = result
+    try {
+      const result = await this.alpress.methods
+        .getName()
+        .call(options);
+
+        this.subdomain = result
+    } catch(error) {
+      return error;
+    }
   }
 
   public async checkTaken(domain: string): Promise<boolean> {
-    const takenResult = await this.alpress.methods.checkTaken(domain).call();
-    return takenResult;
+    try {
+      const takenResult = await this.alpress.methods.checkTaken(domain).call();
+      return takenResult;
+    } catch(error) {
+      return error;
+    }
   }
 
   /**
@@ -573,9 +596,14 @@ export class DLog {
 
   public async getContenthash(subdomain: string): Promise<string> {
     const sub_address = namehash.hash(`${subdomain}.${DLog.ROOT_DOMAIN}`);
-    const content = await this.resolver.methods.contenthash(sub_address).call();
-    const content_hash = contentHash.decode(this.web3.utils.toAscii(content));
-    return content_hash;
+
+    try {
+      const content = await this.resolver.methods.contenthash(sub_address).call();
+      const content_hash = contentHash.decode(this.web3.utils.toAscii(content));
+      return content_hash;
+    } catch(error) {
+      return error;
+    }
   }
 
   // private async setContentHash(ens: ENSContent): Promise<string> {
