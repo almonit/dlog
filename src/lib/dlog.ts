@@ -606,7 +606,6 @@ export class DLog {
   }
 
   private async getFiles(cid: IPFSPath): Promise<Object[]> {
-    console.log("getFiles", cid)
     let contents: Object[] = [];
     for await (const file of this.node.get(cid)) {
       if (!file.content) continue;
@@ -668,8 +667,7 @@ export class DLog {
       const content = await this.resolver.methods
         .contenthash(sub_address)
         .call();
-      console.log('content', content);
-      const content_hash = contentHash.decode(this.web3.utils.toAscii(content));
+      const content_hash = contentHash.decode(content);
       return content_hash;
     } catch (error) {
       return error;
@@ -699,7 +697,7 @@ export class DLog {
   }
 
   private encodeCID(cid: string): string {
-    return contentHash.fromIpfs(cid.toString());
+    return `0x${contentHash.fromIpfs(cid)}`;
   }
 
   // private getBytes32FromIpfsHash(hash: string): string {
