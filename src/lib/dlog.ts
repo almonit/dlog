@@ -22,7 +22,7 @@ export class DLog {
   public alpress;
   public resolver;
   private session: Session = new Session();
-  private swarm_topic: string = "AlpressTestnet";
+  private swarm_topic: string = 'AlpressTestnet';
 
   constructor(
     public node: IPFS,
@@ -38,7 +38,7 @@ export class DLog {
       AlpressResolver.abi,
       alpress_resolver_address
     );
-    if(swarm_topic) this.swarm_topic = swarm_topic;
+    if (swarm_topic) this.swarm_topic = swarm_topic;
   }
 
   /* Public methods */
@@ -398,14 +398,16 @@ export class DLog {
     identity.updateBucketCID(updated_bucket_cid, need_archiving);
 
     const user_cid: IPFSPath = await this.createIdentity(identity);
-    const msg = new TextEncoder().encode(`${subdomain} ${user_cid.toString()}\n`)
-    await this.node.pubsub.publish(this.swarm_topic, msg)
+    const msg = new TextEncoder().encode(
+      `${subdomain} ${user_cid.toString()}\n`
+    );
+    await this.node.pubsub.publish(this.swarm_topic, msg);
     try {
       const result = await this.alpress.methods
         .publish(subdomain, this.encodeCID(user_cid.toString()))
         .send(options);
       return result;
-    } catch(error) {
+    } catch (error) {
       return error;
     }
   }
@@ -452,7 +454,11 @@ export class DLog {
     );
     const { author_cid, bucket_cids } = JSON.parse(identity_data[0].toString());
     const identity = new Identity(
-      new CIDs(1, author_cid.codec, new Uint8Array(Object.values(author_cid.hash))),
+      new CIDs(
+        1,
+        author_cid.codec,
+        new Uint8Array(Object.values(author_cid.hash))
+      ),
       bucket_cids
     );
     return identity;
@@ -485,17 +491,13 @@ export class DLog {
       hashAlg: 'sha2-256',
       flush: true
     });
-    await this.cp(
-      DLog.AUTHOR_PAGE,
-      this.pathJoin(['/dlog', '/alpress']),
-      {
-        parents: true,
-        format: 'dag-pb',
-        hashAlg: 'sha2-256',
-        flush: true,
-        timeout: 5000
-      }
-    );
+    await this.cp(DLog.AUTHOR_PAGE, this.pathJoin(['/dlog', '/alpress']), {
+      parents: true,
+      format: 'dag-pb',
+      hashAlg: 'sha2-256',
+      flush: true,
+      timeout: 5000
+    });
     await this.node.files.write(
       this.pathJoin(['/dlog', '/alpress', '/static', DLog.IDENTITY_FILE]),
       identity.asBuffer(),
@@ -504,7 +506,9 @@ export class DLog {
         truncate: true
       }
     );
-    const { cid }: { cid: IPFSPath } = await this.node.files.stat('/dlog/alpress');
+    const { cid }: { cid: IPFSPath } = await this.node.files.stat(
+      '/dlog/alpress'
+    );
     // const directory_contents = await all(this.node.files.ls('/dlog'))
     // const read_chunks = this.node.files.read('/dlog/index.html', {});
     // const read_content = await this.fromBuffer(read_chunks);
@@ -526,13 +530,13 @@ export class DLog {
   ): Promise<string> {
     const _identity = new Identity(identity.author_cid);
     const user_cid = await this.createIdentity(_identity);
-    
+
     try {
       await this.alpress.methods.buy(subdomain).send({
         ...options,
         value: this.web3.utils.toWei('0.005', 'ether')
       });
-    } catch(error) {
+    } catch (error) {
       return error;
     }
 
@@ -540,22 +544,36 @@ export class DLog {
       const result = await this.alpress.methods
         .publish(subdomain, this.encodeCID(user_cid.toString()))
         .send(options);
-     
+
       await this.setSubdomain(options);
       return result;
-    } catch(error) {
+    } catch (error) {
       return error;
     }
   }
 
-  public async setSubdomain(options): Promise<void> {
-    try {
-      const result = await this.alpress.methods
-        .getName()
-        .call(options);
+  public async login(options) {
+    if (!options || !Object.keys(options).length) {
+      const bucket = await this.retrieveContentFromFile();
+      return { subdomain: null, bucket };
+    }
+    const subdomain = await this.setSubdomain(options);
+    if (!subdomain) return { subdomain: null, bucket: null };
+    const bucket: Bucket = await this.retrieveLatestBucket();
+    return { subdomain, bucket };
+  }
 
-        if (result) this.session.setSubdomain(result);
-    } catch(error) {
+  public logout() {
+    this.session.clearSession();
+  }
+
+  public async setSubdomain(options): Promise<string> {
+    try {
+      const result = await this.alpress.methods.getName().call(options);
+
+      if (result) this.session.setSubdomain(result);
+      return result;
+    } catch (error) {
       return error;
     }
   }
@@ -564,7 +582,7 @@ export class DLog {
     try {
       const takenResult = await this.alpress.methods.checkTaken(domain).call();
       return takenResult;
-    } catch(error) {
+    } catch (error) {
       return error;
     }
   }
@@ -588,6 +606,7 @@ export class DLog {
   }
 
   private async getFiles(cid: IPFSPath): Promise<Object[]> {
+    console.log("getFiles", cid)
     let contents: Object[] = [];
     for await (const file of this.node.get(cid)) {
       if (!file.content) continue;
@@ -627,7 +646,11 @@ export class DLog {
       for await (const file of this.node.get(from)) {
         if (!file.content) continue;
         const cp_content = await this.fromBuffer(file.content);
-        await this.node.files.write(this.pathJoin([to, file['name']]), cp_content, { create: true });
+        await this.node.files.write(
+          this.pathJoin([to, file['name']]),
+          cp_content,
+          { create: true }
+        );
       }
     }
   }
@@ -642,10 +665,13 @@ export class DLog {
   public async getContenthash(subdomain: string): Promise<string> {
     const sub_address = namehash.hash(`${subdomain}.${DLog.ROOT_DOMAIN}`);
     try {
-      const content = await this.resolver.methods.contenthash(sub_address).call();
+      const content = await this.resolver.methods
+        .contenthash(sub_address)
+        .call();
+      console.log('content', content);
       const content_hash = contentHash.decode(this.web3.utils.toAscii(content));
       return content_hash;
-    } catch(error) {
+    } catch (error) {
       return error;
     }
   }
@@ -673,7 +699,7 @@ export class DLog {
   }
 
   private encodeCID(cid: string): string {
-    return contentHash.fromIpfs(cid.toString())
+    return contentHash.fromIpfs(cid.toString());
   }
 
   // private getBytes32FromIpfsHash(hash: string): string {
@@ -683,7 +709,8 @@ export class DLog {
   //     .toString('hex')}`;
   // }
 
-  private _harvestArticle(article) { //Dummy harvesting for PoC
+  private _harvestArticle(article) {
+    //Dummy harvesting for PoC
     if (!article) throw Error('no article found!');
     article = JSON.parse(article);
     if (!article.blocks) throw Error('article is empty');

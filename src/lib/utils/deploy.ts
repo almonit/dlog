@@ -1,14 +1,14 @@
 import Web3 from 'web3';
-import HDWalletProvider from '@truffle/hdwallet-provider';
+// import HDWalletProvider from '@truffle/hdwallet-provider';
 import { AlpressResolver, AlpressRegistrar } from '../../contracts';
 
 async function remoteSetup(): Promise<any> {
-  const provider = new HDWalletProvider(
-    "",
-    "https://:62ff7188c74447b6a67afbc2de247610@rinkeby.infura.io/v3/372375d582d843c48a4eaee6aa5c1b3a"
-  );
+  // const provider = new HDWalletProvider(
+  //   "",
+  //   "https://:62ff7188c74447b6a67afbc2de247610@rinkeby.infura.io/v3/372375d582d843c48a4eaee6aa5c1b3a"
+  // );
 
-  const web3 = new Web3(provider);
+  const web3 = new Web3("provider");
   await deploy(web3);
 }
 
