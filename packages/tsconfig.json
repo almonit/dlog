@@ -1,0 +1,8 @@
+{
+    "files": [],
+    "references": [
+        { "path": "alpress-contract" },
+        { "path": "dlog-utils" },
+        { "path": "dlog" }
+    ]
+}
