@@ -1,0 +1,8 @@
+{
+    "extends": "./tsconfig.json",
+    "include": [
+      "src/**/*.ts",
+      // if any JS file will be used in future
+      //"src/**/*/.js"
+    ]
+  }
