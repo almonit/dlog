@@ -35,7 +35,7 @@ export class DLog {
     public web3: Web3 | any = null,
     alpress_address: string,
     alpress_resolver_address: string,
-    author_page: string = "/ipfs/QmTRfMMmTVwTynpZ83CTYLi7ASA8Xi3SSLBdDL6eGUUuat",
+    author_page: string = '/ipfs/QmTRfMMmTVwTynpZ83CTYLi7ASA8Xi3SSLBdDL6eGUUuat',
     swarm_topic?: string
   ) {
     this.node = node;
@@ -474,27 +474,22 @@ export class DLog {
   /**
    *
    * @param identity [User identity model, has Author CID and list of CID of most recent 3 bucket]
-   * @description create a CID for  author identity with empty alpress 
+   * @description create a CID for  author identity with empty alpress
    * @see https://github.com/ipfs/js-ipfs/blob/master/docs/core-api/FILES.md#ipfsadddata-options
    * @see https://github.com/ipfs/js-ipfs/blob/master/docs/core-api/FILES.md#ipfsfilescpfrom-to-options
    */
   public async createIdentity(identity: Identity): Promise<IPFSPath> {
-
     // clear any existing Alprses folder
-    await this.rm('/alpress', { recursive: true })
+    await this.rm('/alpress', { recursive: true });
 
     // copy empty Alpress into the alpress folder
-    await this.cp(
-      this.author_page,
-      '/alpress',
-      {
-        parents: true,
-        format: 'dag-pb',
-        hashAlg: 'sha2-256',
-        flush: true,
-        timeout: 5000
-      }
-    );
+    await this.cp(this.author_page, '/alpress', {
+      parents: true,
+      format: 'dag-pb',
+      hashAlg: 'sha2-256',
+      flush: true,
+      timeout: 5000
+    });
 
     // copy the author identity file into /alpress/static folder
     await this.node.files.write(
@@ -505,7 +500,7 @@ export class DLog {
         truncate: true
       }
     );
-    
+
     const { cid }: { cid: IPFSPath } = await this.node.files.stat('/alpress');
     // const directory_contents = await all(this.node.files.ls('/dlog'))
     // const read_chunks = this.node.files.read('/dlog/index.html', {});
@@ -528,24 +523,17 @@ export class DLog {
   ): Promise<string> {
     const _identity = new Identity(identity.author_cid);
     const user_cid = await this.createIdentity(_identity);
-    
-    try {
-      await this.alpress.methods.buy(subdomain).send({
-        ...options,
-        value: this.web3.utils.toWei('0.005', 'ether')
-      });
-    } catch(error) {
-      return error;
-    }
 
     try {
       const result = await this.alpress.methods
-        .publish(subdomain, this.encodeCID(user_cid.toString()))
-        .send(options);
-      
-      await this.setSubdomain(options);
-      return result;
-    } catch(error) {
+        .buyAndInitAlpress(subdomain, this.encodeCID(user_cid.toString()))
+        .send({
+          ...options,
+          value: this.web3.utils.toWei('0.005', 'ether')
+        });
+        await this.setSubdomain(options);
+        return result;
+    } catch (error) {
       return error;
     }
   }
@@ -566,11 +554,10 @@ export class DLog {
   }
 
   public async setSubdomain(options): Promise<string | null> {
-     try {
+    try {
       const result = await this.alpress.methods.getName().call(options);
-      
-      if (result) 
-        this.session.setSubdomain(result);
+
+      if (result) this.session.setSubdomain(result);
 
       return result;
     } catch (error) {
@@ -629,8 +616,7 @@ export class DLog {
     try {
       await this.node.files.cp(from, to, options);
     } catch (error) {
-      console.warn('IPFS.Files.CP', error.code, from);
-      console.log("error caught: ", error);
+      console.warn('IPFS.Files.CP', error, from);
       if (error.code == 'ERR_ALREADY_EXISTS') return;
 
       for await (const file of this.node.get(from)) {
@@ -653,10 +639,8 @@ export class DLog {
     try {
       await this.node.files.rm(path, options);
     } catch (error) {
-      if (error.code == 'ERR_NOT_FOUND') 
-        return
-      else
-        console.log(error);
+      if (error.code == 'ERR_NOT_FOUND') return;
+      else console.log(error);
     }
   }
 
