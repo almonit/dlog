@@ -8,8 +8,9 @@ import IPFS from 'ipfs';
 import { IPFSPath } from 'ipfs/types/interface-ipfs-core/common';
 import namehash from 'eth-ens-namehash';
 import Web3 from 'web3';
-
-import { Article, ArticleHeader, Author, Bucket, Identity } from './models';
+import {encrypt as eth_sig_util_encrypt} from 'eth-sig-util';
+eth_sig_util_encrypt
+import { Article, ArticleHeader, Author, Bucket, DraftsBucket, Identity } from './models';
 import { Session } from './models/session';
 
 export class DLog {
@@ -30,15 +31,17 @@ export class DLog {
   private session: Session = new Session();
   private swarm_topic: string = 'AlpressTestnet';
 
+  private symmetricKey;
+
   constructor(
-    public node: IPFS,
+    public ipfs: IPFS,
     public web3: Web3 | any = null,
     alpress_address: string,
     alpress_resolver_address: string,
     author_page: string = '/ipfs/QmTRfMMmTVwTynpZ83CTYLi7ASA8Xi3SSLBdDL6eGUUuat',
     swarm_topic?: string
   ) {
-    this.node = node;
+    this.ipfs = ipfs;
     this.web3 = web3;
     this.alpress = new web3.eth.Contract(AlpressRegistrar.abi, alpress_address);
     this.resolver = new web3.eth.Contract(
@@ -157,6 +160,7 @@ export class DLog {
     const article_header_cid = await this.putArticleHeader(article_header);
 
     let bucket: Bucket = await this.retrieveLatestBucket();
+
     const [
       updated_bucket_cid,
       need_archiving
@@ -408,7 +412,7 @@ export class DLog {
     const msg = new TextEncoder().encode(
       `${subdomain} ${user_cid.toString()}\n`
     );
-    await this.node.pubsub.publish(this.swarm_topic, msg);
+    await this.ipfs.pubsub.publish(this.swarm_topic, msg);
     try {
       const result = await this.alpress.methods
         .publish(subdomain, this.encodeCID(user_cid.toString()))
@@ -492,7 +496,7 @@ export class DLog {
     });
 
     // copy the author identity file into /alpress/static folder
-    await this.node.files.write(
+    await this.ipfs.files.write(
       this.pathJoin(['/alpress', '/static', DLog.IDENTITY_FILE]),
       identity.asBuffer(),
       {
@@ -501,9 +505,9 @@ export class DLog {
       }
     );
 
-    const { cid }: { cid: IPFSPath } = await this.node.files.stat('/alpress');
-    // const directory_contents = await all(this.node.files.ls('/dlog'))
-    // const read_chunks = this.node.files.read('/dlog/index.html', {});
+    const { cid }: { cid: IPFSPath } = await this.ipfs.files.stat('/alpress');
+    // const directory_contents = await all(this.ipfs.files.ls('/dlog'))
+    // const read_chunks = this.ipfs.files.read('/dlog/index.html', {});
     // const read_content = await this.fromBuffer(read_chunks);
     // console.log('read_content', read_content.toString());
     // console.info('directory_contents', directory_contents)
@@ -574,6 +578,154 @@ export class DLog {
     }
   }
 
+  /********** Draft system functions ***********/
+  // draft process description:
+  // - when author is registered, library node begins listening on rooms:
+  //     - authorName_newData, authorName_getData and authorName_getDraft
+  // - author sends new data to authorName_newData, it's composed of mainCID and secondaryCIDs
+
+  public async connectLibrary(LibraryIPFSID: string): Promise<boolean> {
+     await this.ipfs.swarm.connect(LibraryIPFSID);
+  }
+
+  public async sendLibrary(topic, data) {
+    const msg = new TextEncoder().encode(data + '\n');
+    this.ipfs.pubsub.publish(topic, msg);
+  }
+
+  public async registerWithLibrary(name: string, ethereum: any, account: string) 
+  {
+    // generate symmetric key
+    this.symmetricKey = crypto.randomBytes(32); 
+
+    // get encryption key from extension
+    var EthereumEncryptionKey = await ethereum.request({
+      method: 'eth_getEncryptionPublicKey',
+      params: [account],
+    }); 
+
+    // encrypt key with Ethereum account public key
+    let encryptedHexedSymmetricKey = JSON.stringify(
+    eth_sig_util_encrypt(
+      EthereumEncryptionKey,
+      { 'data': symmetricKey },
+      'x25519-xsalsa20-poly1305'
+      )).hexEncode();
+    )
+
+    // prepare drafts settings data to send to librarby node
+    var draftsData = {
+      "from": name,
+      "type": "settings",
+      "data": encryptedHexedSymmetricKey
+    };    
+
+    this.sendLibrary(name + 'Register', draftsData);
+  }
+
+  // TODO: do 'ethereum' and 'account' objects needed here?
+  public async askDataFromLibrary(name: string, ethereum: any, account: string) {
+    await this.ipfs.pubsub.subscribe(name + 'getData', this.dataFromLibrary);
+
+    // request data from library
+    var draftsData = {
+      "from": name,
+      "type": "getData",
+      "data": ""
+    };  
+
+    this.sendLibrary(name + 'getData', draftsData);
+  }
+
+  // TODO: add 'ethereum' object to function
+  public dataFromLibrary(msg) {
+    let data = JSON.parse(msg.data);
+    let encryptedSymmetricKey = data.encryptedSymmetricKey;
+
+
+
+    // decrypt
+    this.symmetricKey = await ethereum.request({
+        method: 'eth_decrypt',
+        params: [ciphertextDisplay.innerText, ethereum.selectedAddress],
+     })
+
+    // subscribe to room of draftsFromLibrary
+    await this.ipfs.pubsub.subscribe(name + 'getDrafts', this.draftsFromLibrary);
+
+    // send request to drafts, send response to draftsFromLibrary function
+    var draftsData = {
+      "from": name,
+      "type": "getDrafts",
+      "data": ""
+    };  
+
+    this.sendLibrary(name + 'getDrafts', draftsData);
+  }
+
+  public draftsFromLibrary(msg) {
+    let decryptedDraftsData = JSON.parse(msg.data).decryptedDraftsData;
+
+    let draftsData = decrypt(decryptedDraftsData, this.symmetricKey);
+    draftsData = JSON.parse(draftsData);
+
+    let drafts_bucket = new DraftsBucket(
+      draftsData.drafts_headers,
+      draftsData.name,
+      draftsData.address,
+      draftsData.author);
+
+    //TODO: do something with drafts_bucket
+  }
+
+  public async sendNewData(type: string, main: boolean, CID_new: IPFSPath, CID_to_replace: IPFSPath) {
+    const identity: Identity = await this.retrieveIdentity(content_hash);
+    const author = this.ipfs_utils.getAuthor(identity.author_cid);
+
+    let msg = {"type": type, 
+               "main": main, 
+               "CID_new": CID_new,
+               "CID_to_replace": CID_to_replace}
+
+    await this.ipfs.pubsub.publish(this.author + 'newData', msg);
+  }
+
+
+  public async addDraft(
+    draft: Article,
+    cover_image: string
+  ): Promise<void> {
+    this.drafts_bucket.addDraft(draft, "some title", cover_image, "some summary", []);
+
+    // communicate draft with library
+  }
+
+  public async initDraftsBucket() {
+    if(!this.subdomain) throw new Error("We couldn't find your account.");
+
+    const content_hash: string = await this.getContenthash(this.subdomain);
+    const identity: Identity = await this.retrieveIdentity(content_hash);
+    const author = this.ipfs_utils.getAuthor(identity.author_cid);
+    this.drafts_bucket = new DraftsBucket([], "", "", author.name);
+  }
+
+
+  public async removeDraft(encrypted_draft_cid: IPFSPath, options: object) {
+    this.drafts_bucket.removeDraft(encrypted_draft_cid);
+
+    // communicate removal with library
+  }
+
+  public async replaceDraft(
+    old_encrypted_draft_cid: IPFSPath,
+    new_draft: Article,
+    author: Author,
+    cover_image: string,
+    options
+  ) {
+    this.drafts_bucket.replaceDraft(old_encrypted_draft_cid, new_draft, "some title", cover_image, "some summary", []);
+  }
+
   /**
    * Return versions of all active libraries
    */
@@ -581,20 +733,20 @@ export class DLog {
     readonly ipfs: object;
     readonly dlog: string;
   }> {
-    const ipfs_version = await this.node.version();
+    const ipfs_version = await this.ipfs.version();
     var pjson = require('../../../package.json');
     let dlog_version: string = pjson.version;
     return { ipfs: ipfs_version, dlog: dlog_version };
   }
 
   private async get(cid: IPFSPath): Promise<object> {
-    const object: object = await this.node.dag.get(cid as CIDs);
+    const object: object = await this.ipfs.dag.get(cid as CIDs);
     return object;
   }
 
   private async getFiles(cid: IPFSPath): Promise<Object[]> {
     let contents: Object[] = [];
-    for await (const file of this.node.get(cid)) {
+    for await (const file of this.ipfs.get(cid)) {
       if (!file.content) continue;
       const content = await this.fromBuffer(file.content);
       contents.push(content);
@@ -603,7 +755,7 @@ export class DLog {
   }
 
   private async put(object: object, options: any = null): Promise<IPFSPath> {
-    const object_cid: IPFSPath = await this.node.dag.put(object, options);
+    const object_cid: IPFSPath = await this.ipfs.dag.put(object, options);
     return object_cid;
   }
 
@@ -614,15 +766,15 @@ export class DLog {
     options: object = { parents: true, recursive: true }
   ): Promise<void> {
     try {
-      await this.node.files.cp(from, to, options);
+      await this.ipfs.files.cp(from, to, options);
     } catch (error) {
       console.warn('IPFS.Files.CP', error, from);
       if (error.code == 'ERR_ALREADY_EXISTS') return;
 
-      for await (const file of this.node.get(from)) {
+      for await (const file of this.ipfs.get(from)) {
         if (!file.content) continue;
         const cp_content = await this.fromBuffer(file.content);
-        await this.node.files.write(
+        await this.ipfs.files.write(
           this.pathJoin([to, file['name']]),
           cp_content,
           { create: true }
@@ -637,7 +789,7 @@ export class DLog {
     options: object = { parents: true, recursive: true }
   ): Promise<void> {
     try {
-      await this.node.files.rm(path, options);
+      await this.ipfs.files.rm(path, options);
     } catch (error) {
       if (error.code == 'ERR_NOT_FOUND') return;
       else console.log(error);

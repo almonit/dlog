@@ -3,37 +3,50 @@ var crypto = require('crypto');
 
 
 export async function encrypt(
-  dataToEncrypt: string,
-  name: string,
-  address: string,
-  web3: Web3
+  data: string,
+  symmetricKey: any
 ): Promise<string>  {
 
-  // create password by signing name
-  let password = await web3.eth.sign(name, address);  
-
   // encrypt data
-  var mykey = crypto.createCipher('aes-128-cbc', password);
-  var encryptedData : string = mykey.update(dataToEncrypt, 'utf8', 'hex')
-  encryptedData += mykey.final('hex');
+  var encryptedData : string = symmetricKey.update(data, 'utf8', 'hex')
+  encryptedData += symmetricKey.final('hex');
 
   return encryptedData;
 }
 
 export async function decrypt(
   dataToDecrypt: string,
-  name: string,
-  address: string,
-  web3: Web3
+  symmetricKey: any
 ): Promise<string>  {
 
-  // create password by signing name
-  let password = await web3.eth.sign(name, address);  
-
   // decrypt data
-  var mykey = crypto.createDecipher('aes-128-cbc', password);
+  var mykey = crypto.createDecipher('aes-128-cbc', symmetricKey);
   var decrypteddData = mykey.update(dataToDecrypt, 'utf8', 'hex')
   decrypteddData += mykey.final('hex');
 
   return decrypteddData;
+}
+
+// *** Misc *** //
+String.prototype.hexEncode = function(){
+    var hex, i;
+
+    var result = "";
+    for (i=0; i<this.length; i++) {
+        hex = this.charCodeAt(i).toString(16);
+        result += ("000"+hex).slice(-4);
+    }
+
+    return result
+}
+
+String.prototype.hexDecode = function(){
+    var j;
+    var hexes = this.match(/.{1,4}/g) || [];
+    var back = "";
+    for(j = 0; j<hexes.length; j++) {
+        back += String.fromCharCode(parseInt(hexes[j], 16));
+    }
+
+    return back;
 }
