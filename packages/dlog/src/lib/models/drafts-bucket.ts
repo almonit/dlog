@@ -2,7 +2,7 @@ import IPFS from 'ipfs';
 import Web3 from 'web3';
 import { IPFSPath } from 'ipfs/types/interface-ipfs-core/common';
 import { Article, ArticleHeader, Author } from './';
-import {encrypt, decrypt} from '../utils/encryption';
+import {encrypt, decrypt} from '@dlog/dlog-utils';
 
 export class DraftsBucket {
   private drafts_headers: ArticleHeader[]; // TODO: should this be IPFSPath[] like in bucket.ts?

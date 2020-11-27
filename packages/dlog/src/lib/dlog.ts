@@ -9,9 +9,10 @@ import { IPFSPath } from 'ipfs/types/interface-ipfs-core/common';
 import namehash from 'eth-ens-namehash';
 import Web3 from 'web3';
 import {encrypt as eth_sig_util_encrypt} from 'eth-sig-util';
-eth_sig_util_encrypt
 import { Article, ArticleHeader, Author, Bucket, DraftsBucket, Identity } from './models';
 import { Session } from './models/session';
+import crypto from 'crypto';
+
 
 export class DLog {
   public static readonly ROOT_DOMAIN: string = 'alpress.eth';
@@ -584,7 +585,7 @@ export class DLog {
   //     - authorName_newData, authorName_getData and authorName_getDraft
   // - author sends new data to authorName_newData, it's composed of mainCID and secondaryCIDs
 
-  public async connectLibrary(LibraryIPFSID: string): Promise<boolean> {
+  public async connectLibrary(LibraryIPFSID: string) {
      await this.ipfs.swarm.connect(LibraryIPFSID);
   }
 
@@ -608,9 +609,9 @@ export class DLog {
     let encryptedHexedSymmetricKey = JSON.stringify(
     eth_sig_util_encrypt(
       EthereumEncryptionKey,
-      { 'data': symmetricKey },
+      { 'data': this.symmetricKey },
       'x25519-xsalsa20-poly1305'
-      )).hexEncode();
+      ));
     )
 
     // prepare drafts settings data to send to librarby node
@@ -624,7 +625,7 @@ export class DLog {
   }
 
   // TODO: do 'ethereum' and 'account' objects needed here?
-  public async askDataFromLibrary(name: string, ethereum: any, account: string) {
+  public async askDataFromLibrary(name: string) {
     await this.ipfs.pubsub.subscribe(name + 'getData', this.dataFromLibrary);
 
     // request data from library
@@ -647,7 +648,7 @@ export class DLog {
     // decrypt
     this.symmetricKey = await ethereum.request({
         method: 'eth_decrypt',
-        params: [ciphertextDisplay.innerText, ethereum.selectedAddress],
+        params: [encryptedSymmetricKey.innerText, ethereum.selectedAddress],
      })
 
     // subscribe to room of draftsFromLibrary
