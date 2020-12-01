@@ -1,16 +1,21 @@
 import { ENSRegistry, FIFSRegistrar } from '@ensdomains/ens';
+import ganache from 'ganache-core';
 import IPFS from 'ipfs';
+import store from 'store';
 import Web3 from 'web3';
 import { AbstractProvider } from 'web3-core/types';
 
 // import getNameHashSHA3 from './hash';
 import { AlpressResolver, AlpressRegistrar } from '@dlog/alpress-contracts';
 
-const ganache = require('ganache-core');
+const storeKey = 'ALPRESS_LOCAL_CONTRACT_ADDRESS_v0';
 
-export async function localSetup(provider = null): Promise<any> {
+export async function localSetup(
+  provider: ganache.Provider | null = null
+): Promise<any> {
   const repoPath = 'repo/ipfs-' + Math.random();
   const ipfs = await IPFS.create({ repo: repoPath });
+
   await ipfs.bootstrap.add(
     '/ip4/95.179.128.10/tcp/5001/p2p/QmYDZk4ns1qSReQoZHcGa8jjy8SdhdAqy3eBgd1YMgGN9j'
   );
@@ -18,16 +23,13 @@ export async function localSetup(provider = null): Promise<any> {
     provider = ganache.provider({
       allowUnlimitedContractSize: true,
       gasLimit: 3000000000,
-      gasPrice: 20000
+      gasPrice: '20000'
     });
-  const web3 = new Web3(
-    provider as any
-    // 'https://:62ff7188c74447b6a67afbc2de247610@ropsten.infura.io/v3/372375d582d843c48a4eaee6aa5c1b3a'
-  );
 
-    const config = await deploy(
-      web3
-    );
+  const web3 = new Web3(provider as any);
+  const contracts = store.get(storeKey);
+  const skipDeploy = await checkIfContractDeployed(web3, contracts);
+  const config = await deploy(web3, skipDeploy, contracts);
 
   return {
     ...config,
@@ -36,10 +38,26 @@ export async function localSetup(provider = null): Promise<any> {
   };
 }
 
-async function deploy(
-  web3,
-) {
+const asyncEvery = async (arr, predicate) => {
+  for (let item of arr) {
+    if (!(await predicate(item))) return false;
+  }
+  return true;
+};
 
+async function checkIfContractDeployed(
+  web3: Web3,
+  contracts: object
+): Promise<boolean> {
+  if (!contracts) return false;
+  return await asyncEvery(Object.values(contracts), async contract => {
+    // maybe address validation here
+    let result = await web3.eth.getCode(contract);
+    return result !== '0x';
+  });
+}
+
+async function deploy(web3, skipDeploy, contracts) {
   // const address_label = getNameHashSHA3(web3, 'alpress').sha3;
   const address_label =
     '0xefa02a3c3d5ae7bcd3eb19a279dee2d2584e97a31cb9a3d54eed0182bd398d80';
@@ -61,70 +79,96 @@ async function deploy(
     gasPrice: '3000000',
     from: main_account
   };
-  
-  const instanceRegistry = new web3.eth.Contract(ENSRegistry.abi);
-  const contractRegistry = await instanceRegistry
-    .deploy({
-      data: ENSRegistry.bytecode
-    })
-    .send(send_options);
 
-  const instanceAlpressRegistrar = new web3.eth.Contract(
-    AlpressRegistrar.abi as any
-  );
-  const contractAlpressRegistrar = await instanceAlpressRegistrar
-    .deploy({
-      data: AlpressRegistrar.bytecode,
-      arguments: [contractRegistry.options.address, empty_account]
-    })
-    .send(send_options);
+  let contractAlpressRegistrar, contractRegistry, contractResolver;
 
-  const instanceResolver = new web3.eth.Contract(AlpressResolver.abi as any);
-  const contractResolver = await instanceResolver
-    .deploy({
-      data: AlpressResolver.bytecode,
-      arguments: [
-        contractRegistry.options.address,
-        contractAlpressRegistrar.options.address
-      ]
-    })
-    .send(send_options);
+  if (!skipDeploy) {
+    // if contract is not in local chain, deploy
+    const instanceRegistry = new web3.eth.Contract(ENSRegistry.abi);
+    contractRegistry = await instanceRegistry
+      .deploy({
+        data: ENSRegistry.bytecode
+      })
+      .send(send_options);
 
-  const instanceTestRegistrar = new web3.eth.Contract(FIFSRegistrar.abi);
-  const contractTestRegistrar = await instanceTestRegistrar
-    .deploy({
-      data: FIFSRegistrar.bytecode,
-      arguments: [contractRegistry.options.address, rootNode.namehash]
-    })
-    .send(send_options);
+    const instanceAlpressRegistrar = new web3.eth.Contract(
+      AlpressRegistrar.abi as any
+    );
+    contractAlpressRegistrar = await instanceAlpressRegistrar
+      .deploy({
+        data: AlpressRegistrar.bytecode,
+        arguments: [contractRegistry.options.address, empty_account]
+      })
+      .send(send_options);
 
-  await contractRegistry.methods
-    .setSubnodeOwner(
-      empty_account,
-      rootNode.sha3,
-      contractTestRegistrar.options.address
-    )
-    .send(send_options);
+    const instanceResolver = new web3.eth.Contract(AlpressResolver.abi as any);
+    contractResolver = await instanceResolver
+      .deploy({
+        data: AlpressResolver.bytecode,
+        arguments: [
+          contractRegistry.options.address,
+          contractAlpressRegistrar.options.address
+        ]
+      })
+      .send(send_options);
 
-  const owner = await contractRegistry.methods.owner(address).call();
-
-  if (owner === empty_account) {
-    await contractTestRegistrar.methods
-      .register(address_label, main_account)
+    const instanceTestRegistrar = new web3.eth.Contract(FIFSRegistrar.abi);
+    const contractTestRegistrar = await instanceTestRegistrar
+      .deploy({
+        data: FIFSRegistrar.bytecode,
+        arguments: [contractRegistry.options.address, rootNode.namehash]
+      })
       .send(send_options);
 
     await contractRegistry.methods
-      .setResolver(address, contractResolver.options.address)
+      .setSubnodeOwner(
+        empty_account,
+        rootNode.sha3,
+        contractTestRegistrar.options.address
+      )
       .send(send_options);
 
-    await contractRegistry.methods
-      .setOwner(address, contractAlpressRegistrar.options.address)
+    const owner = await contractRegistry.methods.owner(address).call();
+
+    if (owner === empty_account) {
+      await contractTestRegistrar.methods
+        .register(address_label, main_account)
+        .send(send_options);
+
+      await contractRegistry.methods
+        .setResolver(address, contractResolver.options.address)
+        .send(send_options);
+
+      await contractRegistry.methods
+        .setOwner(address, contractAlpressRegistrar.options.address)
+        .send(send_options);
+    }
+
+    await contractAlpressRegistrar.methods
+      .setDefaultResolver(contractResolver.options.address)
       .send(send_options);
+
+    // store new contract addresses in local storage for persistency
+    store.set(storeKey, {
+      contractRegistry: contractRegistry.options.address,
+      contractAlpressRegistrar: contractAlpressRegistrar.options.address,
+      contractResolver: contractResolver.options.address
+    });
+  } else {
+    // if contract is already in local chain, just call
+    contractRegistry = new web3.eth.Contract(
+      ENSRegistry.abi,
+      contracts.contractRegistry
+    );
+    contractAlpressRegistrar = new web3.eth.Contract(
+      AlpressRegistrar.abi,
+      contracts.contractAlpressRegistrar
+    );
+    contractResolver = new web3.eth.Contract(
+      AlpressResolver.abi,
+      contracts.contractResolver
+    );
   }
-
-  await contractAlpressRegistrar.methods
-    .setDefaultResolver(contractResolver.options.address)
-    .send(send_options);
 
   return {
     address,

@@ -51,6 +51,7 @@
     "@dlog/alpress-contracts": "^1.0.0",
     "eth-ens-namehash": "^2.0.8",
     "ipfs": "0.50.2",
+    "store": "^2.0.12",
     "web3": "^1.2.8"
   },
   "devDependencies": {
