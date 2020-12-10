@@ -405,6 +405,7 @@ export class DLog {
     identity.updateBucketCID(updated_bucket_cid, need_archiving);
 
     const user_cid: IPFSPath = await this.createIdentity(identity);
+    console.log("user_cid: ", user_cid);
     const msg = new TextEncoder().encode(
       `${subdomain} ${user_cid.toString()}\n`
     );

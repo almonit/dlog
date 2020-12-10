@@ -18,7 +18,8 @@ export class ArticleHeader {
     author: Author,
     cover_image: string,
     summary: string,
-    tags: ReadonlyArray<readonly [readonly IPFSPath[], readonly string[]]>
+    tags: ReadonlyArray<readonly [readonly IPFSPath[], readonly string[]]>,
+    publication_date : Date | boolean = false
   ) {
     this.article_cid = article_cid,
     this.title = title;
@@ -28,6 +29,6 @@ export class ArticleHeader {
     this.tags = tags;
 
     // set publication date for now
-    this.publication_date = new Date();
+    this.publication_date = typeof publication_date == "boolean" ? new Date() : publication_date;
   }
 }
