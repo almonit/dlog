@@ -49,7 +49,7 @@ test('verify version', async t => {
 
 test('put/get author', async t => {
   const dlog = t.context['dlog'];
-  const author: Author = { name: 'mdt', profile_image: '', description: '' };
+  const author: Author = new Author('mdt','', '');
   const cid_author = await dlog.putAuthor(author);
   const result_author = await dlog.getAuthor(cid_author.toString());
   t.is(result_author.name, author.name);
@@ -65,7 +65,7 @@ test('put/get article', async t => {
 
 test('put/get article header', async t => {
   const dlog = t.context['dlog'];
-  const author: Author = { name: 'mdt', profile_image: '', description: '' };
+  const author: Author = new Author('mdt', '', '');
   const article = new Article('Test');
   const article_cid = await dlog.putArticle(article);
 
@@ -87,7 +87,7 @@ test('put/get article header', async t => {
 test('test archiving', async t => {
   const ARTICLES_TO_PUSH = 31;
   const dlog = t.context['dlog'];
-  const author: Author = { name: 'mdt', profile_image: '', description: '' };
+  const author: Author = new Author('mdt', '', '');
 
   const article = new Article(
     '{"blocks":[{"key":"b8nf6","text":"test","type":"header-one","depth":0,"inlineStyleRanges":[],"entityRanges":[],"data":{}}],"entityMap":{}}'
@@ -126,7 +126,7 @@ test('test archiving', async t => {
 
 test('put/get bucket', async t => {
   const dlog = t.context['dlog'];
-  const author: Author = { name: 'mdt', profile_image: '', description: '' };
+  const author: Author = new Author('mdt', '', '');
   const article = new Article('Test');
   const article_cid = await dlog.putArticle(article);
 
@@ -154,7 +154,7 @@ test('put/get bucket', async t => {
 
 test('put/get identity', async t => {
   const dlog = t.context['dlog'];
-  const author: Author = { name: 'mdt', profile_image: '', description: '' };
+  const author: Author = new Author('mdt', '', '');
   const author_cid = await dlog.putAuthor(author);
   const identity = new Identity(author_cid);
   const identity_cid = await dlog.createIdentity(identity);
@@ -167,7 +167,7 @@ test('put/get identity', async t => {
 test('register secondary account', async t => {
   const dlog = t.context['dlog'];
   const { secondary_account, sendOptions } = t.context['ens'];
-  const author: Author = { name: 'mdt', profile_image: '', description: '' };
+  const author: Author = new Author('mdt', '', '');
   const author_cid = await dlog.putAuthor(author);
   const identity = new Identity(author_cid);
   await dlog.register('testing', identity, {
@@ -178,9 +178,8 @@ test('register secondary account', async t => {
   const retrieved_identity = await dlog.retrieveIdentity(content_hash);
   t.is(
     retrieved_identity.author_cid.toString(),
-    identity.author_cid.toString()
+    identity.getAuthorCID().toString()
   );
-  console.log("7");
   dlog.logout();
 });
 
@@ -192,6 +191,17 @@ test('login secondary account', async t => {
     from: secondary_account
   });
   t.is(subdomain, 'testing');
+});
+
+test('update_author', async t => {
+  const dlog = t.context['dlog'];
+  const { secondary_account, sendOptions } = t.context['ens'];
+  const author: Author = new Author('ufnik','', '');
+  await dlog.updateAuthor(author, {
+    ...sendOptions,
+    from: secondary_account
+  });
+  t.pass();
 });
 
 test('publish article', async t => {

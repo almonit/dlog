@@ -1,7 +1,7 @@
 import { IPFSPath } from 'ipfs/types/interface-ipfs-core/common';
 
 export class Identity implements Identity {
-  public readonly author_cid: IPFSPath;
+  private author_cid: IPFSPath;
   private bucket_cids: IPFSPath[];
   private static LIVE_BUCKETS_NUMBER = 3;
 
@@ -30,5 +30,13 @@ export class Identity implements Identity {
     } else {
       this.bucket_cids[0] = bucket_cid;
     }
+  }
+
+  public setAuthorCID(author_cid: IPFSPath) {
+    this.author_cid = author_cid;
+  }
+
+  public getAuthorCID() : IPFSPath {
+    return this.author_cid;
   }
 }

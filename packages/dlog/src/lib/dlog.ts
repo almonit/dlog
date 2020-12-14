@@ -71,8 +71,12 @@ export class DLog {
   }
 
   public async putBucket(bucket: Bucket): Promise<IPFSPath> {
-    const bucket_cid: IPFSPath = await this.put({ ...bucket }, null);
-    return bucket_cid;
+    try {
+      const bucket_cid: IPFSPath = await this.put({ ...bucket }, null);
+      return bucket_cid;
+    } catch (error) {
+      throw Error(error);
+    }
   }
 
   /**
@@ -87,7 +91,7 @@ export class DLog {
     const subdomain = this.session.getSubdomain();
     const content_hash: string = await this.getContenthash(subdomain);
     const identity: Identity = await this.retrieveIdentity(content_hash);
-    const author: Author = await this.getAuthor(identity.author_cid);
+    const author: Author = await this.getAuthor(identity.getAuthorCID());
     this.session.setAuthor(author);
 
     let bucket_cid: any = identity.getBucketCID(0);
@@ -522,7 +526,7 @@ export class DLog {
     identity: Identity,
     options?: object
   ): Promise<string> {
-    const _identity = new Identity(identity.author_cid);
+    const _identity = new Identity(identity['author_cid']);
     const user_cid = await this.createIdentity(_identity);
 
     try {
@@ -537,6 +541,33 @@ export class DLog {
     } catch (error) {
       return error;
     }
+  }
+
+  public async updateAuthor(
+    author: Author,
+    options?: object
+  ): Promise<string> {
+    const subdomain = this.session.getSubdomain();
+    const content_hash: string = await this.getContenthash(subdomain);
+    const identity: Identity = await this.retrieveIdentity(content_hash);
+    const author_cid: IPFSPath = await this.put({ ...author }, null);
+    identity.setAuthorCID(author_cid);
+    const user_cid: IPFSPath = await this.createIdentity(identity);
+
+    const msg = new TextEncoder().encode(
+      `${subdomain} ${user_cid.toString()}\n`
+    );
+    await this.node.pubsub.publish(this.swarm_topic, msg);
+
+    try {
+      const result = await this.alpress.methods
+        .publish(subdomain, this.encodeCID(user_cid.toString()))
+        .send(options);
+      return result;
+    } catch (error) {
+      return error;
+    }
+
   }
 
   public async login(options) {
