@@ -410,10 +410,9 @@ export class DLog {
 
     const user_cid: IPFSPath = await this.createIdentity(identity);
     console.log("user_cid: ", user_cid);
-    const msg = new TextEncoder().encode(
-      `${subdomain} ${user_cid.toString()}\n`
-    );
-    await this.node.pubsub.publish(this.swarm_topic, msg);
+    const msg = `${subdomain} ${user_cid.toString()}`;
+
+    this.connectPublish(this.swarm_topic, msg, 5000);
     try {
       const result = await this.alpress.methods
         .publish(subdomain, this.encodeCID(user_cid.toString()))
@@ -422,6 +421,16 @@ export class DLog {
     } catch (error) {
       return error;
     }
+  }
+
+  private async connectPublish(topic, msg, delay) {
+    await this.node.swarm.connect("/dns4/ipfs.almonit.club/tcp/443/wss/p2p/QmYDZk4ns1qSReQoZHcGa8jjy8SdhdAqy3eBgd1YMgGN9j");
+
+    const msgEncoded = new TextEncoder().encode(msg + '\n')
+
+    setTimeout(() => {
+      this.node.pubsub.publish(topic, msgEncoded).then(console.log('sent to pin msg: ', msg));
+    }, delay);
   }
 
   public async retrieveContentFromFile(): Promise<Bucket> {
