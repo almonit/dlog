@@ -3,7 +3,7 @@ import { AlpressRegistrar, AlpressResolver } from '@dlog/alpress-contracts';
 import BufferList from 'bl';
 import CIDs from 'cids';
 import contentHash from 'content-hash';
-import { loadJSON } from '@dlog/dlog-utils';
+// import { loadJSON } from '@dlog/dlog-utils';
 import IPFS from 'ipfs';
 import { IPFSPath } from 'ipfs/types/interface-ipfs-core/common';
 import namehash from 'eth-ens-namehash';
@@ -434,7 +434,7 @@ export class DLog {
   }
 
   public async retrieveContentFromFile(): Promise<Bucket> {
-    const result = await loadJSON(`./static/${DLog.IDENTITY_FILE}`);
+    const result = await this.loadJSON(`./static/${DLog.IDENTITY_FILE}`);
     const identity = new Identity(
       new CIDs(
         1,
@@ -760,5 +760,21 @@ export class DLog {
       cover_image,
       summary
     };
+  }
+
+  public loadJSON(url: string): Promise<any> {
+    return new Promise(function(resolve, reject) {
+      fetch(url)
+        .then(function(response) {
+          return response.json();
+        })
+        .then(function(data) {
+          resolve(data);
+        })
+        .catch(function(e) {
+          console.error('LoadJSON error: ', e);
+          reject(null);
+        });
+    });
   }
 }
