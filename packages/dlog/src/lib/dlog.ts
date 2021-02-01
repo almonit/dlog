@@ -57,7 +57,7 @@ export class DLog {
 
   public async putAuthor(author: Author): Promise<IPFSPath> {
     try {
-      const author_cid: IPFSPath = await this.put({ ...author }, null);
+      const author_cid: IPFSPath = await this.put({ ...author });
       this.session.setAuthor(author);
       return author_cid;
     } catch (error) {
@@ -72,7 +72,7 @@ export class DLog {
 
   public async putBucket(bucket: Bucket): Promise<IPFSPath> {
     try {
-      const bucket_cid: IPFSPath = await this.put({ ...bucket }, null);
+      const bucket_cid: IPFSPath = await this.put({ ...bucket });
       return bucket_cid;
     } catch (error) {
       throw Error(error);
@@ -119,8 +119,7 @@ export class DLog {
     article_header: ArticleHeader
   ): Promise<IPFSPath> {
     const article_header_cid: IPFSPath = await this.put(
-      { ...article_header },
-      null
+      { ...article_header }
     );
     return article_header_cid;
   }
@@ -131,7 +130,7 @@ export class DLog {
   }
 
   public async putArticle(article: Article): Promise<IPFSPath> {
-    const article_cid: IPFSPath = await this.put({ ...article }, null);
+    const article_cid: IPFSPath = await this.put({ ...article });
     return article_cid;
   }
 
@@ -551,7 +550,7 @@ export class DLog {
     const subdomain = this.session.getSubdomain();
     const content_hash: string = await this.getContenthash(subdomain);
     const identity: Identity = await this.retrieveIdentity(content_hash);
-    const author_cid: IPFSPath = await this.put({ ...author }, null);
+    const author_cid: IPFSPath = await this.put({ ...author });
     identity.setAuthorCID(author_cid);
     const user_cid: IPFSPath = await this.createIdentity(identity);
 
@@ -635,7 +634,7 @@ export class DLog {
     return contents;
   }
 
-  private async put(object: object, options: any = null): Promise<IPFSPath> {
+  private async put(object: object, options: any = {}): Promise<IPFSPath> {
     const object_cid: IPFSPath = await this.node.dag.put(object, options);
     return object_cid;
   }

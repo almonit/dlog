@@ -8,6 +8,6 @@ export class Article {
     serializedArticle: string,
   ) {
     this.serializedArticle = serializedArticle;
-    this.publication_date = new Date();
+    this.publication_date = Date.now();
   }
 }

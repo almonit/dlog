@@ -10,7 +10,7 @@ export class ArticleHeader {
   public readonly tags: ReadonlyArray<
     readonly [readonly IPFSPath[], readonly string[]]
   >;
-  public readonly publication_date: Date;
+  public readonly publication_date: any;
 
   constructor(
     article_cid: IPFSPath,
@@ -19,7 +19,7 @@ export class ArticleHeader {
     cover_image: string,
     summary: string,
     tags: ReadonlyArray<readonly [readonly IPFSPath[], readonly string[]]>,
-    publication_date?: Date
+    publication_date?: any
   ) {
     (this.article_cid = article_cid), (this.title = title);
     this.author = author;
@@ -28,6 +28,6 @@ export class ArticleHeader {
     this.tags = tags;
 
     // set publication date for now
-    this.publication_date = publication_date ? publication_date : new Date();
+    this.publication_date = publication_date ? publication_date : Date.now();
   }
 }
