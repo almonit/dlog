@@ -36,7 +36,7 @@ export class Identity implements Identity {
     this.author_cid = author_cid;
   }
 
-  public getAuthorCID() : IPFSPath {
+  public getAuthorCID(): IPFSPath {
     return this.author_cid;
   }
 }

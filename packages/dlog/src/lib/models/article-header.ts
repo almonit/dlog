@@ -4,6 +4,7 @@ import { IPFSPath } from 'ipfs/types/interface-ipfs-core/common';
 export class ArticleHeader {
   public readonly article_cid: IPFSPath; //IPFSPath of Article object
   public readonly title: string;
+  public readonly article_id: string;
   public readonly author: Author;
   public readonly cover_image: string;
   public readonly summary: string;
@@ -15,13 +16,16 @@ export class ArticleHeader {
   constructor(
     article_cid: IPFSPath,
     title: string,
+    article_id: string,
     author: Author,
     cover_image: string,
     summary: string,
     tags: ReadonlyArray<readonly [readonly IPFSPath[], readonly string[]]>,
     publication_date?: any
   ) {
-    (this.article_cid = article_cid), (this.title = title);
+    this.article_cid = article_cid;
+    this.title = title;
+    this.article_id = article_id;
     this.author = author;
     this.cover_image = cover_image;
     this.summary = summary;

@@ -1,4 +1,4 @@
-import { Author } from "./author";
+import { Author } from './author';
 
 export class Session {
   private current_author: Author | null = null;

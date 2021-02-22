@@ -9,19 +9,21 @@ import { IPFSPath } from 'ipfs/types/interface-ipfs-core/common';
 import namehash from 'eth-ens-namehash';
 import Web3 from 'web3';
 
-import { Article, ArticleHeader, Author, Bucket, Identity } from './models';
+import {
+  Article,
+  ArticleHeader,
+  ArticlesIndex,
+  Author,
+  Bucket,
+  Identity
+} from './models';
 import { Session } from './models/session';
 
 export class DLog {
   public static readonly ROOT_DOMAIN: string = 'alpress.eth';
 
-  // Cryptoanachist manifests
-  // public static readonly AUTHOR_PAGE: string =
-  //   '/ipfs/QmZjNmDspDCuw9bkgFQcwsoKuxHKzifqq7yTEEyQdeHCXp';
-
-  public static readonly AUTHOR_PAGE: string =
-    '/ipfs/QmTRfMMmTVwTynpZ83CTYLi7ASA8Xi3SSLBdDL6eGUUuat';
   public static readonly IDENTITY_FILE: string = 'identity.json';
+  public static readonly ARTICLES_INDEX: string = 'articles_index.json';
   public static readonly INDEX_FILE: string = 'index.html';
 
   public alpress;
@@ -118,13 +120,25 @@ export class DLog {
   public async putArticleHeader(
     article_header: ArticleHeader
   ): Promise<IPFSPath> {
-    const article_header_cid: IPFSPath = await this.put(
-      { ...article_header }
-    );
+    const article_header_cid: IPFSPath = await this.put({ ...article_header });
     return article_header_cid;
   }
 
+  public async getArticleFromIndex(
+    article_id: string
+  ): Promise<IPFSPath | boolean> {
+    let articles_index: ArticlesIndex = await this.retrieveArticlesIndex();
+    const article_cid = articles_index.getArticle(article_id);
+    return article_cid;
+  }
+
   public async getArticle(cid: IPFSPath): Promise<Article> {
+    if (typeof cid !== 'string')
+      cid = new CIDs(
+        cid['version'],
+        cid['codec'],
+        new Buffer(Object.values(cid['hash']))
+      );
     const { value }: { value: Article } = (await this.get(cid)) as any;
     return value;
   }
@@ -142,16 +156,21 @@ export class DLog {
   public async publishArticle(
     article: Article,
     options: object
-  ): Promise<void> {
+  ): Promise<string> {
     const author = this.session.getAuthor();
     const article_cid: IPFSPath = await this.putArticle(article);
     const { title, cover_image, summary } = this._harvestArticle(
       article.serializedArticle
     );
+
+    let articles_index: ArticlesIndex = await this.retrieveArticlesIndex();
+    const article_id = articles_index.addArticle(title, article_cid);
+
     // TO DO think of a way to extract summary, title for Article Summary model
     const article_header = new ArticleHeader(
       article_cid,
       title,
+      article_id,
       author,
       cover_image,
       summary,
@@ -169,10 +188,25 @@ export class DLog {
       `new bucket cid: ${updated_bucket_cid}, needs archiving: ${need_archiving}`
     );
 
-    await this._publish(updated_bucket_cid, need_archiving, options);
+    await this._publish(
+      updated_bucket_cid,
+      articles_index,
+      need_archiving,
+      options
+    );
+
+    return article_id;
   }
 
-  public async removeArticle(article_summary_cid: IPFSPath, options: object) {
+  public async removeArticle(
+    article_id: string,
+    article_summary_cid: IPFSPath,
+    options: object
+  ) {
+    // remove article_id from index
+    let articles_index = await this.retrieveArticlesIndex();
+    articles_index.removeArticle(article_id);
+
     this.session.getSubdomain(); // will throw if no session
     let bucket: Bucket = await this.retrieveLatestBucket();
     const updated_bucket_cid = await this._removeArticle(
@@ -180,10 +214,11 @@ export class DLog {
       bucket
     );
     if (updated_bucket_cid)
-      await this._publish(updated_bucket_cid, false, options);
+      await this._publish(updated_bucket_cid, articles_index, false, options);
   }
 
   public async replaceArticle(
+    article_id: string,
     old_article_summary_cid: IPFSPath,
     new_article: Article,
     options
@@ -194,9 +229,15 @@ export class DLog {
       new_article.serializedArticle
     );
     // TO DO think of a way to extract summary, title for Article Summary model
+
+    // update article_cid in index
+    let articles_index = await this.retrieveArticlesIndex();
+    articles_index.updateArticle(article_id, article_cid);
+
     const article_header = new ArticleHeader(
       article_cid,
       title,
+      article_id,
       author,
       cover_image,
       summary,
@@ -210,7 +251,7 @@ export class DLog {
       bucket
     );
     if (updated_bucket_cid)
-      await this._publish(updated_bucket_cid, false, options);
+      await this._publish(updated_bucket_cid, articles_index, false, options);
   }
 
   public async addArticleHeaderCIDToBucket(
@@ -398,17 +439,23 @@ export class DLog {
 
   private async _publish(
     updated_bucket_cid: IPFSPath,
+    articles_index: ArticlesIndex,
     need_archiving: boolean = false,
     options: object
   ) {
-    await this.node.swarm.connect("/dns4/ipfs.almonit.club/tcp/443/wss/p2p/QmYDZk4ns1qSReQoZHcGa8jjy8SdhdAqy3eBgd1YMgGN9j");
+    await this.node.swarm.connect(
+      '/dns4/ipfs.almonit.club/tcp/443/wss/p2p/QmYDZk4ns1qSReQoZHcGa8jjy8SdhdAqy3eBgd1YMgGN9j'
+    );
     const subdomain = this.session.getSubdomain();
     const content_hash: string = await this.getContenthash(subdomain);
     const identity: Identity = await this.retrieveIdentity(content_hash);
 
     identity.updateBucketCID(updated_bucket_cid, need_archiving);
 
-    const user_cid: IPFSPath = await this.createIdentity(identity);
+    const user_cid: IPFSPath = await this.createIdentity(
+      identity,
+      articles_index
+    );
     const msg = `${subdomain} ${user_cid.toString()}`;
     const msgEncoded = new TextEncoder().encode(msg + '\n');
     try {
@@ -419,7 +466,7 @@ export class DLog {
       console.log('sent to pin msg: ', msg);
       return result;
     } catch (error) {
-      console.warn("error", error);
+      console.warn('error', error);
       return error;
     }
   }
@@ -455,6 +502,31 @@ export class DLog {
    *
    * @param content_hash string of CID object
    */
+  public async retrieveArticlesIndex(): Promise<ArticlesIndex> {
+    let article_index_obj;
+
+    try {
+      const subdomain = this.session.getSubdomain();
+      const content_hash: string = await this.getContenthash(subdomain);
+      const articles_index_data = await this.getFiles(
+        this.pathJoin([content_hash, '/static', DLog.ARTICLES_INDEX])
+      );
+      article_index_obj = JSON.parse(articles_index_data[0].toString());
+    } catch (error) {
+      article_index_obj = await this.loadJSON(
+        `./static/${DLog.ARTICLES_INDEX}`
+      );
+    }
+    
+    const articles_index = new ArticlesIndex(article_index_obj);
+
+    return articles_index;
+  }
+
+  /**
+   *
+   * @param content_hash string of CID object
+   */
   public async retrieveIdentity(content_hash: string): Promise<Identity> {
     /**
      * look for reading identity
@@ -483,7 +555,10 @@ export class DLog {
    * @see https://github.com/ipfs/js-ipfs/blob/master/docs/core-api/FILES.md#ipfsadddata-options
    * @see https://github.com/ipfs/js-ipfs/blob/master/docs/core-api/FILES.md#ipfsfilescpfrom-to-options
    */
-  public async createIdentity(identity: Identity): Promise<IPFSPath> {
+  public async createIdentity(
+    identity: Identity,
+    articles_index: ArticlesIndex
+  ): Promise<IPFSPath> {
     // clear any existing Alprses folder
     await this.rm('/alpress', { recursive: true });
 
@@ -500,6 +575,16 @@ export class DLog {
     await this.node.files.write(
       this.pathJoin(['/alpress', '/static', DLog.IDENTITY_FILE]),
       identity.asBuffer(),
+      {
+        create: true,
+        truncate: true
+      }
+    );
+
+    // copy the articles index file into /alpress/static folder
+    await this.node.files.write(
+      this.pathJoin(['/alpress', '/static', DLog.ARTICLES_INDEX]),
+      articles_index.asBuffer(),
       {
         create: true,
         truncate: true
@@ -527,7 +612,8 @@ export class DLog {
     options?: object
   ): Promise<string> {
     const _identity = new Identity(identity['author_cid']);
-    const user_cid = await this.createIdentity(_identity);
+    const _articles_index = new ArticlesIndex(null);
+    const user_cid = await this.createIdentity(_identity, _articles_index);
 
     try {
       const result = await this.alpress.methods
@@ -536,23 +622,24 @@ export class DLog {
           ...options,
           value: this.web3.utils.toWei('0.005', 'ether')
         });
-        await this.setSubdomain(options);
-        return result;
+      await this.setSubdomain(options);
+      return result;
     } catch (error) {
       return error;
     }
   }
 
-  public async updateAuthor(
-    author: Author,
-    options?: object
-  ): Promise<string> {
+  public async updateAuthor(author: Author, options?: object): Promise<string> {
     const subdomain = this.session.getSubdomain();
     const content_hash: string = await this.getContenthash(subdomain);
     const identity: Identity = await this.retrieveIdentity(content_hash);
+    const articles_index: ArticlesIndex = await this.retrieveArticlesIndex(); // TODO: improve, possible too many IPFS calls here
     const author_cid: IPFSPath = await this.put({ ...author });
     identity.setAuthorCID(author_cid);
-    const user_cid: IPFSPath = await this.createIdentity(identity);
+    const user_cid: IPFSPath = await this.createIdentity(
+      identity,
+      articles_index
+    );
 
     const msg = new TextEncoder().encode(
       `${subdomain} ${user_cid.toString()}\n`
@@ -567,7 +654,6 @@ export class DLog {
     } catch (error) {
       return error;
     }
-
   }
 
   public async login(options) {

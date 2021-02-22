@@ -53,7 +53,7 @@ export class Bucket implements Bucket {
    */
   public removeArticle(index: number) {
     if (index < this.article_header_cids.length)
-      this.article_header_cids.splice(index, 1)
+      this.article_header_cids.splice(index, 1);
     // TODO: else throw error, "index is longer than number of articles"
   }
 
@@ -66,7 +66,7 @@ export class Bucket implements Bucket {
     return this.article_header_cids.findIndex(
       cid => cid.toString() === article_summary_cid.toString()
     );
-  }  
+  }
 
   /**
    * replace article in a given index with a new versoin
@@ -104,7 +104,6 @@ export class Bucket implements Bucket {
   public loadBucket(bucket: Bucket): void {
     this.article_header_cids = bucket.article_header_cids;
     this.previous_bucket_cid = bucket.previous_bucket_cid;
-    if (bucket.index >= -1)
-      this.index = bucket.index;
+    if (bucket.index >= -1) this.index = bucket.index;
   }
 }
