@@ -6,7 +6,6 @@
     "module": "esnext"
   },
   "exclude": [
-    "node_modules/**",
-    "src/**/*.spec.ts"
+    "node_modules/**"
   ]
 }

@@ -13,7 +13,8 @@ import {
   Bucket,
   Identity
 } from './models';
-import { localSetup, timeTravel } from '@dlog/dlog-utils';
+import { timeTravel } from '@dlog/dlog-utils';
+import { localSetup } from '@dlog/dlog-utils/build/main/local-setup';
 
 test.before(async t => {
   const {
