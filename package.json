@@ -12,7 +12,9 @@
     "typescript": "3.9.3"
   },
   "scripts": {
-    "build": "tsc -b packages/alpress-contracts packages/dlog-utils packages/dlog",
+    "build": "./node_modules/.bin/lerna exec -- yarn build",
+    "link:all": "./node_modules/.bin/lerna exec -- yarn link --production",
+    "publish:local": "./node_modules/.bin/lerna exec -- yalc publish",
     "clean": "./node_modules/.bin/lerna exec -- yarn clean"
   }
 }

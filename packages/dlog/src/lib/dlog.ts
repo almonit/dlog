@@ -3,7 +3,7 @@ import { AlpressRegistrar, AlpressResolver } from '@dlog/alpress-contracts';
 import BufferList from 'bl';
 import CIDs from 'cids';
 import contentHash from 'content-hash';
-// import { loadJSON } from '@dlog/dlog-utils';
+import { loadJSON } from '@dlog/dlog-utils';
 import IPFS from 'ipfs';
 import { IPFSPath } from 'ipfs/types/interface-ipfs-core/common';
 import namehash from 'eth-ens-namehash';
@@ -112,8 +112,11 @@ export class DLog {
     return bucket;
   }
 
-  public async getArticleHeader(cid: IPFSPath): Promise<ArticleHeader> {
-    const { value }: { value: ArticleHeader } = (await this.get(cid)) as any;
+  public async getArticleHeader(
+    cid: IPFSPath,
+    options = {}
+  ): Promise<ArticleHeader> {
+    const { value }: { value: ArticleHeader } = (await this.get(cid, options)) as any;
     return value;
   }
 
@@ -472,7 +475,7 @@ export class DLog {
   }
 
   public async retrieveContentFromFile(): Promise<Bucket> {
-    const result = await this.loadJSON(`./static/${DLog.IDENTITY_FILE}`);
+    const result = await loadJSON(`./static/${DLog.IDENTITY_FILE}`);
     const identity = new Identity(
       new CIDs(
         1,
@@ -513,7 +516,7 @@ export class DLog {
       );
       article_index_obj = JSON.parse(articles_index_data[0].toString());
     } catch (error) {
-      article_index_obj = await this.loadJSON(
+      article_index_obj = await loadJSON(
         `./static/${DLog.ARTICLES_INDEX}`
       );
     }
@@ -705,8 +708,8 @@ export class DLog {
     return { ipfs: ipfs_version, dlog: dlog_version };
   }
 
-  private async get(cid: IPFSPath): Promise<object> {
-    const object: object = await this.node.dag.get(cid as CIDs);
+  private async get(cid: IPFSPath, options = {}): Promise<object> {
+    const object: object = await this.node.dag.get(cid as CIDs, options);
     return object;
   }
 
@@ -837,21 +840,5 @@ export class DLog {
       cover_image,
       summary
     };
-  }
-
-  public loadJSON(url: string): Promise<any> {
-    return new Promise(function(resolve, reject) {
-      fetch(url)
-        .then(function(response) {
-          return response.json();
-        })
-        .then(function(data) {
-          resolve(data);
-        })
-        .catch(function(e) {
-          console.error('LoadJSON error: ', e);
-          reject(null);
-        });
-    });
   }
 }

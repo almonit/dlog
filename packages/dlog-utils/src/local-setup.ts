@@ -3,7 +3,6 @@ import ganache from 'ganache-core';
 import IPFS from 'ipfs';
 import store from 'store';
 import Web3 from 'web3';
-import { AbstractProvider } from 'web3-core/types';
 
 // import getNameHashSHA3 from './hash';
 import { AlpressResolver, AlpressRegistrar } from '@dlog/alpress-contracts';
@@ -179,24 +178,4 @@ async function deploy(web3, skipDeploy, contracts) {
     secondary_account,
     send_options
   };
-}
-
-export function timeTravel(
-  web3: { currentProvider: AbstractProvider },
-  time: number
-): Promise<void> {
-  return new Promise(resolve => {
-    web3.currentProvider.sendAsync(
-      {
-        jsonrpc: '2.0',
-        method: 'evm_increaseTime',
-        params: [time],
-        id: new Date().getTime()
-      },
-      error => {
-        if (error) throw error;
-        resolve();
-      }
-    );
-  });
 }

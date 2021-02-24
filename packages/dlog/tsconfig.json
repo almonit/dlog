@@ -5,7 +5,7 @@
     "outDir": "build/main"
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules/**"],
+  "exclude": ["node_modules/**", "src/**/*.spec.ts"],
   "references": [
     { "path": "../alpress-contracts" },
     { "path": "../dlog-utils" }
