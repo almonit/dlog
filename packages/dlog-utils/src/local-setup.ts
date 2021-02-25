@@ -1,6 +1,7 @@
 import { ENSRegistry, FIFSRegistrar } from '@ensdomains/ens';
 import ganache from 'ganache-core';
 import IPFS from 'ipfs';
+import Multiaddr from 'multiaddr';
 import store from 'store';
 import Web3 from 'web3';
 
@@ -16,7 +17,7 @@ export async function localSetup(
   const ipfs = await IPFS.create({ repo: repoPath });
 
   await ipfs.bootstrap.add(
-    '/ip4/95.179.128.10/tcp/5001/p2p/QmYDZk4ns1qSReQoZHcGa8jjy8SdhdAqy3eBgd1YMgGN9j'
+    new Multiaddr('/ip4/95.179.128.10/tcp/5001/p2p/QmYDZk4ns1qSReQoZHcGa8jjy8SdhdAqy3eBgd1YMgGN9j')
   );
   if (!provider)
     provider = ganache.provider({

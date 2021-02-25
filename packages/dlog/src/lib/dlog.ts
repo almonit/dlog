@@ -4,8 +4,7 @@ import BufferList from 'bl';
 import CIDs from 'cids';
 import contentHash from 'content-hash';
 import { loadJSON } from '@dlog/dlog-utils';
-import IPFS from 'ipfs';
-import { IPFSPath } from 'ipfs/types/interface-ipfs-core/common';
+import { IPFS } from 'ipfs';
 import namehash from 'eth-ens-namehash';
 import Web3 from 'web3';
 
@@ -18,6 +17,7 @@ import {
   Identity
 } from './models';
 import { Session } from './models/session';
+import Multiaddr from 'multiaddr';
 
 export class DLog {
   public static readonly ROOT_DOMAIN: string = 'alpress.eth';
@@ -52,14 +52,14 @@ export class DLog {
   }
 
   /* Public methods */
-  public async getAuthor(cid: IPFSPath): Promise<Author> {
+  public async getAuthor(cid: any): Promise<Author> {
     const { value }: { value: Author } = (await this.get(cid)) as any;
     return value;
   }
 
-  public async putAuthor(author: Author): Promise<IPFSPath> {
+  public async putAuthor(author: Author): Promise<any> {
     try {
-      const author_cid: IPFSPath = await this.put({ ...author });
+      const author_cid: any = await this.put({ ...author });
       this.session.setAuthor(author);
       return author_cid;
     } catch (error) {
@@ -67,14 +67,14 @@ export class DLog {
     }
   }
 
-  public async getBucket(cid: IPFSPath): Promise<Bucket> {
+  public async getBucket(cid: any): Promise<Bucket> {
     const { value }: { value: Bucket } = (await this.get(cid)) as any;
     return value;
   }
 
-  public async putBucket(bucket: Bucket): Promise<IPFSPath> {
+  public async putBucket(bucket: Bucket): Promise<any> {
     try {
-      const bucket_cid: IPFSPath = await this.put({ ...bucket });
+      const bucket_cid: any = await this.put({ ...bucket });
       return bucket_cid;
     } catch (error) {
       throw Error(error);
@@ -113,7 +113,7 @@ export class DLog {
   }
 
   public async getArticleHeader(
-    cid: IPFSPath,
+    cid: any,
     options = {}
   ): Promise<ArticleHeader> {
     const { value }: { value: ArticleHeader } = (await this.get(cid, options)) as any;
@@ -122,20 +122,20 @@ export class DLog {
 
   public async putArticleHeader(
     article_header: ArticleHeader
-  ): Promise<IPFSPath> {
-    const article_header_cid: IPFSPath = await this.put({ ...article_header });
+  ): Promise<any> {
+    const article_header_cid: any = await this.put({ ...article_header });
     return article_header_cid;
   }
 
   public async getArticleFromIndex(
     article_id: string
-  ): Promise<IPFSPath | boolean> {
+  ): Promise<any | boolean> {
     let articles_index: ArticlesIndex = await this.retrieveArticlesIndex();
     const article_cid = articles_index.getArticle(article_id);
     return article_cid;
   }
 
-  public async getArticle(cid: IPFSPath): Promise<Article> {
+  public async getArticle(cid: any): Promise<Article> {
     if (typeof cid !== 'string')
       cid = new CIDs(
         cid['version'],
@@ -146,8 +146,8 @@ export class DLog {
     return value;
   }
 
-  public async putArticle(article: Article): Promise<IPFSPath> {
-    const article_cid: IPFSPath = await this.put({ ...article });
+  public async putArticle(article: Article): Promise<any> {
+    const article_cid: any = await this.put({ ...article });
     return article_cid;
   }
 
@@ -161,7 +161,7 @@ export class DLog {
     options: object
   ): Promise<string> {
     const author = this.session.getAuthor();
-    const article_cid: IPFSPath = await this.putArticle(article);
+    const article_cid: any = await this.putArticle(article);
     const { title, cover_image, summary } = this._harvestArticle(
       article.serializedArticle
     );
@@ -203,7 +203,7 @@ export class DLog {
 
   public async removeArticle(
     article_id: string,
-    article_summary_cid: IPFSPath,
+    article_summary_cid: any,
     options: object
   ) {
     // remove article_id from index
@@ -222,12 +222,12 @@ export class DLog {
 
   public async replaceArticle(
     article_id: string,
-    old_article_summary_cid: IPFSPath,
+    old_article_summary_cid: any,
     new_article: Article,
     options
   ) {
     const author = this.session.getAuthor();
-    const article_cid: IPFSPath = await this.putArticle(new_article);
+    const article_cid: any = await this.putArticle(new_article);
     const { title, cover_image, summary } = this._harvestArticle(
       new_article.serializedArticle
     );
@@ -258,11 +258,11 @@ export class DLog {
   }
 
   public async addArticleHeaderCIDToBucket(
-    article_header_cid: IPFSPath,
+    article_header_cid: any,
     bucket: Bucket
-  ): Promise<[IPFSPath, boolean]> {
+  ): Promise<[any, boolean]> {
     let need_archiving: boolean = false;
-    let updated_bucket_cid: IPFSPath;
+    let updated_bucket_cid: any;
     let bucket_index = bucket.getIndex();
 
     if (bucket.size() < Bucket.BUCKET_LIMIT) {
@@ -270,7 +270,7 @@ export class DLog {
       bucket.addArticleHeaderCID(article_header_cid);
     } else if (bucket_index < Bucket.NON_ARCHIVE_LIMIT) {
       bucket.addArticleHeaderCID(article_header_cid);
-      let removed_article_header_cid: IPFSPath = bucket.removeLastArticleHeaderCID();
+      let removed_article_header_cid: any = bucket.removeLastArticleHeaderCID();
       let previous_bucket_cid = bucket.getPreviousBucketCID();
       if (previous_bucket_cid == null) {
         let new_bucket = new Bucket([removed_article_header_cid], null);
@@ -304,7 +304,7 @@ export class DLog {
       //create new bucket to replace it. It begins with one article, but will be filled in the archiving process
       let new_bucket = new Bucket([article_header_cid], updated_bucket_cid);
       new_bucket.setIndex(Bucket.NON_ARCHIVE_LIMIT);
-      const new_bucket_cid: IPFSPath = (updated_bucket_cid = await this.putBucket(
+      const new_bucket_cid: any = (updated_bucket_cid = await this.putBucket(
         new_bucket
       ));
 
@@ -319,16 +319,16 @@ export class DLog {
    * removes an article from the dlog.
    * function uses recursive search to find the bucket that has the article.
    * it deletes the articles from the bucket,  and updates recursively all the CIDs.
-   * @param  {IPFSPath} article_summary_cid [description]
+   * @param  {any} article_summary_cid [description]
    * @param  {Bucket}   bucket              bucket from which function start to look for the article
    * @return {Promise}                      returns [CID of updated bucket, true] if article was found
    *                                        or [nul, false] otherwise.
    */
   private async _removeArticle(
-    article_summary_cid: IPFSPath,
+    article_summary_cid: any,
     bucket: Bucket
-  ): Promise<IPFSPath | null> {
-    let updated_bucket_cid: IPFSPath | null = null;
+  ): Promise<any | null> {
+    let updated_bucket_cid: any | null = null;
     let bucket_cid_update_needed: boolean = false;
 
     // search article in bucket
@@ -367,11 +367,11 @@ export class DLog {
   }
 
   private async _replaceArticle(
-    old_article_summary_cid: IPFSPath,
-    new_article_summary_cid: IPFSPath,
+    old_article_summary_cid: any,
+    new_article_summary_cid: any,
     bucket: Bucket
-  ): Promise<IPFSPath | null> {
-    let updated_bucket_cid: IPFSPath | null = null;
+  ): Promise<any | null> {
+    let updated_bucket_cid: any | null = null;
     let bucket_cid_update_needed: boolean = false;
 
     // search article in bucket
@@ -412,7 +412,7 @@ export class DLog {
 
   public async archiving(bucket: Bucket): Promise<Bucket> {
     let previous: Bucket = await this.getBucket(
-      bucket.getPreviousBucketCID() as IPFSPath
+      bucket.getPreviousBucketCID() as any
     );
     let previous_bucket = new Bucket([]);
     previous_bucket.loadBucket(previous);
@@ -428,7 +428,7 @@ export class DLog {
     if (previous_bucket.getIndex() <= base_APBAA_modulo)
       article_headers_to_pass = article_headers_to_pass + 1;
 
-    let article_cids: IPFSPath[] = [];
+    let article_cids: any[] = [];
 
     for (let i = 0; i < article_headers_to_pass; i++)
       article_cids[i] = bucket.removeLastArticleHeaderCID();
@@ -441,13 +441,13 @@ export class DLog {
   }
 
   private async _publish(
-    updated_bucket_cid: IPFSPath,
+    updated_bucket_cid: any,
     articles_index: ArticlesIndex,
     need_archiving: boolean = false,
     options: object
   ) {
     await this.node.swarm.connect(
-      '/dns4/ipfs.almonit.club/tcp/443/wss/p2p/QmYDZk4ns1qSReQoZHcGa8jjy8SdhdAqy3eBgd1YMgGN9j'
+      new Multiaddr('/dns4/ipfs.almonit.club/tcp/443/wss/p2p/QmYDZk4ns1qSReQoZHcGa8jjy8SdhdAqy3eBgd1YMgGN9j')
     );
     const subdomain = this.session.getSubdomain();
     const content_hash: string = await this.getContenthash(subdomain);
@@ -455,7 +455,7 @@ export class DLog {
 
     identity.updateBucketCID(updated_bucket_cid, need_archiving);
 
-    const user_cid: IPFSPath = await this.createIdentity(
+    const user_cid: any = await this.createIdentity(
       identity,
       articles_index
     );
@@ -465,7 +465,7 @@ export class DLog {
       const result = await this.alpress.methods
         .publish(subdomain, this.encodeCID(user_cid.toString()))
         .send(options);
-      await this.node.pubsub.publish(this.swarm_topic, msgEncoded);
+      await this.node.pubsub.publish(this.swarm_topic, msgEncoded, {});
       console.log('sent to pin msg: ', msg);
       return result;
     } catch (error) {
@@ -561,7 +561,7 @@ export class DLog {
   public async createIdentity(
     identity: Identity,
     articles_index: ArticlesIndex
-  ): Promise<IPFSPath> {
+  ): Promise<any> {
     // clear any existing Alprses folder
     await this.rm('/alpress', { recursive: true });
 
@@ -594,7 +594,7 @@ export class DLog {
       }
     );
 
-    const { cid }: { cid: IPFSPath } = await this.node.files.stat('/alpress');
+    const { cid }: { cid: any } = await this.node.files.stat('/alpress');
     // const directory_contents = await all(this.node.files.ls('/dlog'))
     // const read_chunks = this.node.files.read('/dlog/index.html', {});
     // const read_content = await this.fromBuffer(read_chunks);
@@ -637,9 +637,9 @@ export class DLog {
     const content_hash: string = await this.getContenthash(subdomain);
     const identity: Identity = await this.retrieveIdentity(content_hash);
     const articles_index: ArticlesIndex = await this.retrieveArticlesIndex(); // TODO: improve, possible too many IPFS calls here
-    const author_cid: IPFSPath = await this.put({ ...author });
+    const author_cid: any = await this.put({ ...author });
     identity.setAuthorCID(author_cid);
-    const user_cid: IPFSPath = await this.createIdentity(
+    const user_cid: any = await this.createIdentity(
       identity,
       articles_index
     );
@@ -647,7 +647,7 @@ export class DLog {
     const msg = new TextEncoder().encode(
       `${subdomain} ${user_cid.toString()}\n`
     );
-    await this.node.pubsub.publish(this.swarm_topic, msg);
+    await this.node.pubsub.publish(this.swarm_topic, msg, {});
 
     try {
       const result = await this.alpress.methods
@@ -708,31 +708,31 @@ export class DLog {
     return { ipfs: ipfs_version, dlog: dlog_version };
   }
 
-  private async get(cid: IPFSPath, options = {}): Promise<object> {
-    const object: object = await this.node.dag.get(cid as CIDs, options);
+  private async get(cid: any, options = {}): Promise<object> {
+    const object: object = await this.node.dag.get(cid as any, options);
     return object;
   }
 
-  private async getFiles(cid: IPFSPath): Promise<Object[]> {
+  private async getFiles(cid: any): Promise<Object[]> {
     let contents: Object[] = [];
     for await (const file of this.node.get(cid)) {
-      if (!file.content) continue;
-      const content = await this.fromBuffer(file.content);
+      if (!file['content']) continue;
+      const content = await this.fromBuffer(file['content']);
       contents.push(content);
     }
     return contents;
   }
 
-  private async put(object: object, options: any = {}): Promise<IPFSPath> {
-    const object_cid: IPFSPath = await this.node.dag.put(object, options);
+  private async put(object: object, options: any = {}): Promise<any> {
+    const object_cid: any = await this.node.dag.put(object, options);
     return object_cid;
   }
 
   // ipfs cp function with added error handling
   private async cp(
-    from: IPFSPath | string,
+    from: any | string,
     to: string,
-    options: object = { parents: true, recursive: true }
+    options: object = { parents: true, recursive: true, timeout: 5000 }
   ): Promise<void> {
     try {
       await this.node.files.cp(from, to, options);
@@ -741,8 +741,9 @@ export class DLog {
       if (error.code == 'ERR_ALREADY_EXISTS') return;
 
       for await (const file of this.node.get(from)) {
-        if (!file.content) continue;
-        const cp_content = await this.fromBuffer(file.content);
+        console.log('file', file);
+        if (!file['content']) continue;
+        const cp_content = await this.fromBuffer(file['content']);
         await this.node.files.write(
           this.pathJoin([to, file['name']]),
           cp_content,

@@ -1,5 +1,3 @@
-import { IPFSPath } from 'ipfs/types/interface-ipfs-core/common';
-
 /*
 This class uses the concept of article_id.
 article_id = article title with '-' instead of 
@@ -16,7 +14,7 @@ export class ArticlesIndex {
     else this.index = new Object();
   }
 
-  public addArticle(title: string, article_cid: IPFSPath): string {
+  public addArticle(title: string, article_cid: any): string {
     let article_id_removed_spaces = title.replace(/ /g, '-');
     let article_id = article_id_removed_spaces + '-' + this.generateHash();
 
@@ -38,13 +36,13 @@ export class ArticlesIndex {
     }
   }
 
-  public updateArticle(article_id: string, article_cid: IPFSPath) {
+  public updateArticle(article_id: string, article_cid: any) {
     this.index[article_id] = article_cid;
   }
 
   // getArticle returns false if article_id is not in index,
   // hence it can be used also for a tool to check for existence of article_id in the index
-  public getArticle(article_id: string): IPFSPath | false {
+  public getArticle(article_id: string): any | false {
     const article = this.index[article_id];
     if (article) return this.index[article_id];
     return false;

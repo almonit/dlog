@@ -1,8 +1,10 @@
 {
   "extends": "../tsconfig.settings.json",
   "compilerOptions": {
+    "checkJs": false,
     "rootDir": "src",
-    "outDir": "build/main"
+    "outDir": "build/main",
+    "skipLibCheck": true
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules/**"],
