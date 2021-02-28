@@ -16,9 +16,18 @@ jobs:
   build:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
+      - uses: ibnesayeed/setup-ipfs@master
+        with:
+          run_daemon: true
+      - name: Pin Author Page
+        shell: bash
+        run: |
+          set -o pipefail
+          ipfs pin add QmNhnNDXE2wgPJbijE5Sgx651AJdy4b8jPs7nQezYYLAbE
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2
         with:

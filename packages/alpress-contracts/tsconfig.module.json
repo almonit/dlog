@@ -2,7 +2,9 @@
   "extends": "./tsconfig",
   "compilerOptions": {
     "target": "esnext",
-    "module": "esnext"
+    "module": "esnext",
+    "rootDir": "src",
+    "outDir": "build/module"
   },
   "include": ["src/**/*.ts", "src/**/*.json"],
   "exclude": ["node_modules/**", "src/contracts/**"],

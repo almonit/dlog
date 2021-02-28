@@ -1,16 +1,14 @@
-import { IPFSPath } from 'ipfs/types/interface-ipfs-core/common';
-
 export class Identity implements Identity {
-  private author_cid: IPFSPath;
-  private bucket_cids: IPFSPath[];
+  private author_cid: any;
+  private bucket_cids: any[];
   private static LIVE_BUCKETS_NUMBER = 3;
 
-  constructor(author_cid: IPFSPath, bucket_cids: IPFSPath[] = []) {
+  constructor(author_cid: any, bucket_cids: any[] = []) {
     this.author_cid = author_cid;
     this.bucket_cids = bucket_cids;
   }
 
-  public getBucketCID(index: number): IPFSPath {
+  public getBucketCID(index: number): any {
     return this.bucket_cids[index];
   }
 
@@ -22,7 +20,7 @@ export class Identity implements Identity {
     return Buffer.from(JSON.stringify(identity));
   }
 
-  public updateBucketCID(bucket_cid: IPFSPath, need_archiving: boolean): void {
+  public updateBucketCID(bucket_cid: any, need_archiving: boolean): void {
     //TODO update this as it needs to store 3 buckets at a time
     if (need_archiving) {
       this.bucket_cids.unshift(bucket_cid);
@@ -32,11 +30,11 @@ export class Identity implements Identity {
     }
   }
 
-  public setAuthorCID(author_cid: IPFSPath) {
+  public setAuthorCID(author_cid: any) {
     this.author_cid = author_cid;
   }
 
-  public getAuthorCID() : IPFSPath {
+  public getAuthorCID(): any {
     return this.author_cid;
   }
 }

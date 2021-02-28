@@ -9,10 +9,12 @@
   ],
   "devDependencies": {
     "lerna": "^3.22.1",
-    "typescript": "3.9.3"
+    "typescript": "4.1.x"
   },
   "scripts": {
     "build": "./node_modules/.bin/lerna run build --stream",
+    "link:all": "./node_modules/.bin/lerna exec -- yarn link --production",
+    "publish:local": "./node_modules/.bin/lerna exec -- yalc publish",
     "clean": "./node_modules/.bin/lerna exec -- yarn clean --stream",
     "test:unit": "./node_modules/.bin/lerna run --scope=@dlog/dlog test:unit --stream"
   }
