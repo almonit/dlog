@@ -28,7 +28,6 @@ test.before(async t => {
     send_options,
     web3
   } = await localSetup();
-
   t.context['ens'] = {
     address: address,
     account: main_account,
@@ -43,7 +42,7 @@ test.before(async t => {
     web3,
     contractAlpressRegistrar.options.address,
     contractResolver.options.address,
-    "/ipfs/QmNhnNDXE2wgPJbijE5Sgx651AJdy4b8jPs7nQezYYLAbE"
+    '/ipfs/QmNhnNDXE2wgPJbijE5Sgx651AJdy4b8jPs7nQezYYLAbE'
   );
   t.context['alpress'] = contractAlpressRegistrar;
 });

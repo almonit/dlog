@@ -571,7 +571,7 @@ export class DLog {
       format: 'dag-pb',
       hashAlg: 'sha2-256',
       flush: true,
-      timeout: 5000
+      timeout: 15000
     });
 
     // copy the author identity file into /alpress/static folder
@@ -741,7 +741,6 @@ export class DLog {
       if (error.code == 'ERR_ALREADY_EXISTS') return;
 
       for await (const file of this.node.get(from)) {
-        console.log('file', file);
         if (!file['content']) continue;
         const cp_content = await this.fromBuffer(file['content']);
         await this.node.files.write(
