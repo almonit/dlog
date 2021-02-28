@@ -112,6 +112,32 @@ export class DLog {
     return bucket;
   }
 
+  public async retrieveAuthor(): Promise<Author> {
+    let identity_file;
+    try {
+      const subdomain = this.session.getSubdomain();
+      const content_hash: string = await this.getContenthash(subdomain);
+      const identity_data = await this.getFiles(
+        this.pathJoin([content_hash, '/static', DLog.IDENTITY_FILE])
+      );
+      identity_file = JSON.parse(identity_data[0].toString());
+    } catch (error) {
+      identity_file = await loadJSON(`./static/${DLog.IDENTITY_FILE}`);
+    }
+    const identity = new Identity(
+      new CIDs(
+        1,
+        identity_file.author_cid.codec,
+        new Uint8Array(Object.values(identity_file.author_cid.hash))
+      ),
+      identity_file.bucket_cids
+    );
+    const author: Author = await this.getAuthor(identity.getAuthorCID());
+
+    return author;
+  }
+
+
   public async getArticleHeader(
     cid: any,
     options = {}
