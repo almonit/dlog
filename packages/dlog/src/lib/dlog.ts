@@ -137,25 +137,23 @@ export class DLog {
     return author;
   }
 
-
   public async getArticleHeader(
     cid: any,
     options = {}
   ): Promise<ArticleHeader> {
-    const { value }: { value: ArticleHeader } = (await this.get(cid, options)) as any;
+    const { value }: { value: ArticleHeader } = (await this.get(
+      cid,
+      options
+    )) as any;
     return value;
   }
 
-  public async putArticleHeader(
-    article_header: ArticleHeader
-  ): Promise<any> {
+  public async putArticleHeader(article_header: ArticleHeader): Promise<any> {
     const article_header_cid: any = await this.put({ ...article_header });
     return article_header_cid;
   }
 
-  public async getArticleFromIndex(
-    article_id: string
-  ): Promise<any | boolean> {
+  public async getArticleFromIndex(article_id: string): Promise<any | boolean> {
     let articles_index: ArticlesIndex = await this.retrieveArticlesIndex();
     const article_cid = articles_index.getArticle(article_id);
     return article_cid;
@@ -473,7 +471,9 @@ export class DLog {
     options: object
   ) {
     await this.node.swarm.connect(
-      new Multiaddr('/dns4/ipfs.almonit.club/tcp/443/wss/p2p/QmYDZk4ns1qSReQoZHcGa8jjy8SdhdAqy3eBgd1YMgGN9j')
+      new Multiaddr(
+        '/dns4/ipfs.almonit.club/tcp/443/wss/p2p/QmYDZk4ns1qSReQoZHcGa8jjy8SdhdAqy3eBgd1YMgGN9j'
+      )
     );
     const subdomain = this.session.getSubdomain();
     const content_hash: string = await this.getContenthash(subdomain);
@@ -481,17 +481,15 @@ export class DLog {
 
     identity.updateBucketCID(updated_bucket_cid, need_archiving);
 
-    const user_cid: any = await this.createIdentity(
-      identity,
-      articles_index
-    );
+    const user_cid: any = await this.createIdentity(identity, articles_index);
+
     const msg = `${subdomain} ${user_cid.toString()}`;
-    const msgEncoded = new TextEncoder().encode(msg + '\n');
+    this._connectPublish(this.swarm_topic, msg, 5000);
+    
     try {
       const result = await this.alpress.methods
         .publish(subdomain, this.encodeCID(user_cid.toString()))
         .send(options);
-      await this.node.pubsub.publish(this.swarm_topic, msgEncoded, {});
       console.log('sent to pin msg: ', msg);
       return result;
     } catch (error) {
@@ -542,11 +540,9 @@ export class DLog {
       );
       article_index_obj = JSON.parse(articles_index_data[0].toString());
     } catch (error) {
-      article_index_obj = await loadJSON(
-        `./static/${DLog.ARTICLES_INDEX}`
-      );
+      article_index_obj = await loadJSON(`./static/${DLog.ARTICLES_INDEX}`);
     }
-    
+
     const articles_index = new ArticlesIndex(article_index_obj);
 
     return articles_index;
@@ -665,15 +661,10 @@ export class DLog {
     const articles_index: ArticlesIndex = await this.retrieveArticlesIndex(); // TODO: improve, possible too many IPFS calls here
     const author_cid: any = await this.put({ ...author });
     identity.setAuthorCID(author_cid);
-    const user_cid: any = await this.createIdentity(
-      identity,
-      articles_index
-    );
+    const user_cid: any = await this.createIdentity(identity, articles_index);
 
-    const msg = new TextEncoder().encode(
-      `${subdomain} ${user_cid.toString()}\n`
-    );
-    await this.node.pubsub.publish(this.swarm_topic, msg, {});
+    const msg = `${subdomain} ${user_cid.toString()}`;
+    this._connectPublish(this.swarm_topic, msg, 5000);
 
     try {
       const result = await this.alpress.methods
@@ -844,6 +835,22 @@ export class DLog {
   //     .slice(2)
   //     .toString('hex')}`;
   // }
+
+  private async _connectPublish(topic, msg, delay: number) {
+    await this.node.swarm.connect(
+      new Multiaddr(
+        '/dns4/ipfs.almonit.club/tcp/443/wss/p2p/QmYDZk4ns1qSReQoZHcGa8jjy8SdhdAqy3eBgd1YMgGN9j'
+      )
+    );
+
+    const msgEncoded = new TextEncoder().encode(msg + '\n');
+
+    setTimeout(() => {
+      this.node.pubsub
+        .publish(topic, msgEncoded, {})
+        .then(() => console.log('sent to pin msg: ', msg));
+    }, delay);
+  }
 
   private _harvestArticle(article) {
     //Dummy harvesting for PoC
