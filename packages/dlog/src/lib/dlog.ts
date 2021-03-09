@@ -153,10 +153,10 @@ export class DLog {
     return article_header_cid;
   }
 
-  public async getArticleFromIndex(article_id: string): Promise<any | boolean> {
+  public async getArticleHeaderCIDFromIndex(article_id: string): Promise<any | boolean> {
     let articles_index: ArticlesIndex = await this.retrieveArticlesIndex();
-    const article_cid = articles_index.getArticle(article_id);
-    return article_cid;
+    const article_header_cid = articles_index.getArticle(article_id);
+    return article_header_cid;
   }
 
   public async getArticle(cid: any): Promise<Article> {
@@ -190,8 +190,9 @@ export class DLog {
       article.serializedArticle
     );
 
+    // create article_id
     let articles_index: ArticlesIndex = await this.retrieveArticlesIndex();
-    const article_id = articles_index.addArticle(title, article_cid);
+    let article_id = articles_index.createArticleID(title);
 
     // TO DO think of a way to extract summary, title for Article Summary model
     const article_header = new ArticleHeader(
@@ -204,6 +205,9 @@ export class DLog {
       []
     );
     const article_header_cid = await this.putArticleHeader(article_header);
+
+    // add article to index
+    articles_index.addArticle(article_id, article_header_cid);
 
     let bucket: Bucket = await this.retrieveLatestBucket();
     const [
@@ -257,10 +261,6 @@ export class DLog {
     );
     // TO DO think of a way to extract summary, title for Article Summary model
 
-    // update article_cid in index
-    let articles_index = await this.retrieveArticlesIndex();
-    articles_index.updateArticle(article_id, article_cid);
-
     const article_header = new ArticleHeader(
       article_cid,
       title,
@@ -271,6 +271,11 @@ export class DLog {
       []
     );
     const new_article_summary_cid = await this.putArticleHeader(article_header);
+
+    // update article_cid in index
+    let articles_index = await this.retrieveArticlesIndex();
+    articles_index.updateArticle(article_id, new_article_summary_cid);
+
     let bucket: Bucket = await this.retrieveLatestBucket();
     const updated_bucket_cid = await this._replaceArticle(
       old_article_summary_cid,
