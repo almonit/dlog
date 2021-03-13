@@ -33,9 +33,9 @@ export class ArticlesIndex {
     this.index[article_id] = article_header_cid;
   }
 
-  // getArticle returns false if article_id is not in index,
+  // getArticleHeaderCID returns false if article_id is not in index,
   // hence it can be used also for a tool to check for existence of article_id in the index
-  public getArticle(article_id: string): any | false {
+  public getArticleHeaderCID(article_id: string): any | false {
     const article = this.index[article_id];
     if (article) return this.index[article_id];
     return false;

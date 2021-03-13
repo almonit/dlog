@@ -54,7 +54,7 @@
     "@dlog/dlog-utils": "^0.0.1",
     "bl": "^4.0.2",
     "eth-ens-namehash": "^2.0.8",
-    "ipfs": "0.54.2",
+    "ipfs": "0.54.4",
     "web3": "1.3.2"
   },
   "devDependencies": {

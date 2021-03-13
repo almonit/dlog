@@ -155,8 +155,16 @@ export class DLog {
 
   public async getArticleHeaderCIDFromIndex(article_id: string): Promise<any | boolean> {
     let articles_index: ArticlesIndex = await this.retrieveArticlesIndex();
-    const article_header_cid = articles_index.getArticle(article_id);
-    return article_header_cid;
+    const article_header_cid = articles_index.getArticleHeaderCID(article_id);
+    if (!article_header_cid) return false;
+
+    const { version, codec, hash } = article_header_cid
+    let cid = new CIDs(
+      version,
+      codec,
+      new Buffer(Object.values(hash))
+    );
+    return cid.toString();
   }
 
   public async getArticle(cid: any): Promise<Article> {

@@ -27,7 +27,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          ipfs pin add QmNhnNDXE2wgPJbijE5Sgx651AJdy4b8jPs7nQezYYLAbE
+          ipfs pin add QmZ9RmntPqShpWj6upLnHKRjUv8TM6D5ZMw7RahBMDQFta
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2
         with:
