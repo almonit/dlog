@@ -70,7 +70,7 @@
     "ava": "2.2.0",
     "codecov": "^3.5.0",
     "cz-conventional-changelog": "^2.1.0",
-    "eslint": "^7.0.0",
+    "eslint": "^9.26.0",
     "eslint-config-prettier": "^6.11.0",
     "eslint-plugin-import": "^2.20.2",
     "eslint-plugin-jsdoc": "^25.4.2",
